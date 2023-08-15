@@ -207,7 +207,7 @@ namespace SearchTest
 			Trace.WriteLine(heavyDivider);
 			Trace.WriteLine(lightDivider);
 
-			const int maxTestIterations = 2;	// 10;  // 20;
+			const int maxTestIterations = 5;	// 10;  // 20;
 			const int maxTestPatterns = 1000; // maximal amount of matching byte sequences, which will be distributed randomly over the buffer
 			const int minPatternSize = 3;
 			const int maxPatternSize = 273;
