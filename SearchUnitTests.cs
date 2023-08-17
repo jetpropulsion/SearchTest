@@ -227,7 +227,7 @@ namespace SearchTest
 				//Generate both search pattern and buffer over which the search is performed from the random data
 				int patternSize = GetRandom(minPatternSize, maxPatternSize);
 				int bufferSize = GetRandom(minBufferSize, maxBufferSize);
-				int safetyMarginSizeInBytes = 0;	// patternSize;	// 2 zeros are needed for BerryRavindran
+				int safetyMarginSizeInBytes = patternSize;	// 2 zeros are needed for BerryRavindran
 
 				//Generate unique pattern for this iteration from the random data
 				byte[] testPattern = new byte[patternSize];
@@ -237,8 +237,8 @@ namespace SearchTest
 				byte[] testBuffer = new byte[bufferSize + safetyMarginSizeInBytes];
 				byte fillByte = testPattern[Random.Shared.Next(minValue: 0, maxValue: patternSize)];
 				Array.Fill<byte>(testBuffer, fillByte, 0, bufferSize);
-				//Array.Fill<byte>(testBuffer, 0, bufferSize, safetyMarginSizeInBytes);
-				//Array.Copy(testPattern, 0, testBuffer, bufferSize, patternSize);	//only for BackwardFast: copy pattern after the search buffer end
+				Array.Fill<byte>(testBuffer, 0, bufferSize, safetyMarginSizeInBytes);
+				Array.Copy(testPattern, 0, testBuffer, bufferSize, patternSize);	//only for BackwardFast: copy pattern after the search buffer end
 
 				Trace.WriteLine($"Generator: iteration #{testIteration,5}, fillByte:0x{fillByte:X2}, patternSize:{patternSize,6}, bufferSize:{bufferSize,16:###,###,###,###}, testBuffer.Length:{testBuffer.Length}");
 
@@ -257,7 +257,7 @@ namespace SearchTest
 
 				List<int> referenceOffsets = new List<int>();
 				referenceSearch.Init(testPattern, (int offset, Type caller) => { referenceOffsets.Add(offset); return true; });
-				referenceSearch.Search(testBuffer, 0);
+				referenceSearch.Search(testBuffer, 0, bufferSize);
 				referenceOffsets.Sort();
 
 				if (referenceOffsets.Count != testOffsets.Count || !referenceOffsets.SequenceEqual(testOffsets))
@@ -353,7 +353,7 @@ namespace SearchTest
 					searchWatch.Restart();
 					try
 					{
-						genericSearch.Search(testBuffer, 0);
+						genericSearch.Search(testBuffer, 0, bufferSize);
 					}
 					catch (Exception ex)
 					{
