@@ -207,12 +207,16 @@ namespace SearchTest
 			Trace.WriteLine(heavyDivider);
 			Trace.WriteLine(lightDivider);
 
-			const int maxTestIterations = 5;	// 10;  // 20;
+			const int maxTestIterations = 2;	// 5;	// 10;  // 20;
 			const int maxTestPatterns = 1000; // maximal amount of matching byte sequences, which will be distributed randomly over the buffer
 			const int minPatternSize = 3;
 			const int maxPatternSize = 273;
 			const int minBufferSize = 1048576 * 16;
-			const int maxBufferSize = minBufferSize * 24;	// * 24;
+			const int maxBufferSize = minBufferSize * 24;
+
+			//Reference search algorithm is now BruteForce, choosen over its simplicity (and slowness)
+			ISearch referenceSearch = new Search.Algorithms.BruteForce();
+			Type referenceType = referenceSearch.GetType();
 
 			Dictionary<Type, SearchStatistics> statistics = new();
 			for (int testIteration = 1; testIteration <= maxTestIterations; ++testIteration)
@@ -223,7 +227,7 @@ namespace SearchTest
 				//Generate both search pattern and buffer over which the search is performed from the random data
 				int patternSize = GetRandom(minPatternSize, maxPatternSize);
 				int bufferSize = GetRandom(minBufferSize, maxBufferSize);
-				int safetyMarginSizeInBytes = patternSize;	// 2 zeros are needed for BerryRavindran
+				int safetyMarginSizeInBytes = 0;	// patternSize;	// 2 zeros are needed for BerryRavindran
 
 				//Generate unique pattern for this iteration from the random data
 				byte[] testPattern = new byte[patternSize];
@@ -234,9 +238,9 @@ namespace SearchTest
 				byte fillByte = testPattern[Random.Shared.Next(minValue: 0, maxValue: patternSize)];
 				Array.Fill<byte>(testBuffer, fillByte, 0, bufferSize);
 				//Array.Fill<byte>(testBuffer, 0, bufferSize, safetyMarginSizeInBytes);
-				Array.Copy(testPattern, 0, testBuffer, bufferSize, patternSize);	//only for BackwardFast
+				//Array.Copy(testPattern, 0, testBuffer, bufferSize, patternSize);	//only for BackwardFast: copy pattern after the search buffer end
 
-				Trace.WriteLine($"Generator: iteration #{testIteration,-5}, fillByte:0x{fillByte:X2}, patternSize:{patternSize,6}, bufferSize:{bufferSize,16:###,###,###,###}");
+				Trace.WriteLine($"Generator: iteration #{testIteration,5}, fillByte:0x{fillByte:X2}, patternSize:{patternSize,6}, bufferSize:{bufferSize,16:###,###,###,###}, testBuffer.Length:{testBuffer.Length}");
 
 				List<int> testOffsets = new List<int>();
 
@@ -251,12 +255,46 @@ namespace SearchTest
 					//Trace.WriteLine($"Generator: inserting at {offset}");
 				}
 
+				List<int> referenceOffsets = new List<int>();
+				referenceSearch.Init(testPattern, (int offset, Type caller) => { referenceOffsets.Add(offset); return true; });
+				referenceSearch.Search(testBuffer, 0);
+				referenceOffsets.Sort();
+
+				if (referenceOffsets.Count != testOffsets.Count || !referenceOffsets.SequenceEqual(testOffsets))
+				{
+					IEnumerable<int> intersect = referenceOffsets.Intersect(testOffsets);
+					IEnumerable<int> reference = referenceOffsets.Except(intersect);
+					IEnumerable<int> current = testOffsets.Except(intersect);
+
+					for (int i = 0; i < reference.Count(); ++i)
+					{
+						Trace.WriteLine($"algorithm \"{referenceSearch.GetType().FullName}\" only at position {i}: {reference.ElementAt(i)}");
+					}
+
+					for (int i = 0; i < current.Count(); ++i)
+					{
+						Trace.WriteLine($"test offsets at position {i}: {current.ElementAt(i)}");
+					}
+
+					Assert.Fail($"Reference offsets (Count={referenceOffsets.Count}) not equal to Test offsets (Count={testOffsets.Count})");
+				}
+
 				Stopwatch initWatch = new();
 				Stopwatch searchWatch = new();
 
 				//double timeUpscaling = 1000.0;
 				//double timeDownscaling = 0.001;
 
+				HashSet<Type> blacklistedTypes = new HashSet<Type>()
+				{
+					typeof(Search.Common.SearchBase)					//Skip SearchBase itself (TODO?: use IsInherited)
+				};
+				List<Type> blacklistedAttributes = new List<Type>()
+				{
+					typeof(Search.Attributes.UnstableAttribute),
+					typeof(Search.Attributes.ExperimentalAttribute),
+					typeof(Search.Attributes.SlowAttribute),
+				};
 				foreach (Type type in ((TypeInfo[])asm.DefinedTypes).Select(t => t.UnderlyingSystemType))
 				{
 					//hasMetric equals true if type is inheriting from ISearch interface
@@ -267,16 +305,19 @@ namespace SearchTest
 					{
 						continue;
 					}
-					//Skip SearchBase itself
-					if (typeof(Search.Common.SearchBase).Equals(type))
+
+					//Skip blacklisted tyoes, like base classes
+					if (blacklistedTypes.Contains(type))
 					{
 						continue;
 					}
-					//Skip search algorithm class if marked with ExperimentalAttribute
-					if (type.IsDefined(typeof(Search.Common.ExperimentalAttribute)))
+
+					//Skip search algorithm class if marked with blacklisted Attribute
+					if (blacklistedAttributes.Any(x => type.IsDefined(x)))
 					{
 						continue;
 					}
+
 					//If statistics context doesn't contain SearchStatistics object, this is the first occurence, add new one
 					if (!statistics.ContainsKey(type))
 					{
@@ -293,8 +334,18 @@ namespace SearchTest
 
 					//Accumulate duration of initialization for each generic search algorithm
 					initWatch.Restart();
+
 					//Lambda inline function advises search algorithm implementation what is the search pattern and the delegate whic receives the offset when pattern is found.
-					genericSearch.Init(testPattern, (int offset, Type caller) => { statistics[caller].Offsets.Add(offset); return true; });
+					genericSearch.Init
+					(
+						testPattern,
+						(int offset, Type caller) =>
+						{
+							statistics[caller].Offsets.Add(offset);
+							return true;
+						}
+					);
+					//Stop the timer, and increment initialization time statistics
 					initWatch.Stop();
 					_ = statistics[type].IncrementInitializationTime(initWatch.Elapsed.Ticks);
 
@@ -312,27 +363,18 @@ namespace SearchTest
 					_ = statistics[type].IncrementSearchTime(searchWatch.Elapsed.Ticks);
 				}
 
-				var referenceOffsets = new List<int>();
-				//Reference search algorithm is now BruteForce, choosen over its simplicity (and slowness)
-				ISearch referenceSearch = new Search.Algorithms.BruteForce();
-				referenceSearch.Init(testPattern, (int offset, Type caller) => { referenceOffsets.Add(offset); return true; });
-				referenceSearch.Search(testBuffer, 0);
-				referenceOffsets.Sort();
-
 				int discrepancies = 0;
 				foreach (Type key in statistics.Keys.OrderBy(x => x.FullName, StringComparer.Ordinal))
 				{
-					if(key.Equals(typeof(Search.Algorithms.BruteForce)))
+					if (key.Equals(referenceType))
 					{
-						//Trace.WriteLine("Skipping reference algorithm");
 						continue;
 					}
+
 					List<int> offsets = statistics[key].Offsets;
 					offsets.Sort();
-					//if (offsets.Count != referenceOffsets.Count || !offsets.SequenceEqual(referenceOffsets))
 					if (offsets.Count != referenceOffsets.Count || !offsets.SequenceEqual(referenceOffsets))
 					{
-						//|| offsets.Count != testOffsets.Count || !offsets.SequenceEqual(testOffsets)
 						++discrepancies;
 						Trace.WriteLine($"results of the algorithm run \"{key}\" differs from brute force");
 
@@ -367,31 +409,81 @@ namespace SearchTest
 			double grandSearch = TimeSpan.FromTicks(grandTotals.SearchTime).TotalMilliseconds;
 			double grandTotal = TimeSpan.FromTicks(grandTotals.InitTime + grandTotals.SearchTime).TotalMilliseconds;
 
+			string verticalSeparator = string.Concat(" ", stringLightVerticalLine, " ");
+
+			List<string[]> statColumns = new List<string[]>();
+			double referenceTime = statistics[referenceType].TotalMilliseconds;
+			const string stringRef = @" [Ref]";
 			foreach (Type type in statistics.Keys.OrderBy(t => statistics[t].InitTime + statistics[t].SearchTime))
 			{
 				SearchStatistics stats = statistics[type];
 
-				string[] statStrings = new string[]
-				{
-					type.FullName!.PadRight(maxName + 1, ' '),
-					$"Init {stats.InitMilliseconds,16:F3} ms ({stats.InitMilliseconds * 100.0 / grandTotal,6:##0.00}%)",
-					$"Search {stats.SearchMilliseconds,16:F3} ms ({stats.SearchMilliseconds * 100.0 / grandTotal,6:##0.00}%)",
-					$"Total {stats.TotalMilliseconds,16:F3} ms ({stats.TotalMilliseconds * 100.0 / grandTotal,6:##0.00}%)"
-				};
+				List<string> statColumn = new List<string>();
 
-				string stuff = string.Concat(" ", stringLightVerticalLine, " ");
-				string readableStats = string.Join(stuff, statStrings.Select(v => string.Concat(v, " ")).ToArray());
-				Trace.WriteLine(string.Concat(readableStats));
+				if(type.Equals(referenceType))
+				{ statColumn.Add(string.Concat(type.FullName!, stringRef).PadRight(maxName + stringRef.Length)); }
+				else
+				{ statColumn.Add(type.FullName!.PadRight(maxName + stringRef.Length)); }
+
+				statColumn.Add($"{stats.InitMilliseconds:##0.000}");
+				statColumn.Add($"{stats.InitMilliseconds * 100.0 / grandTotal:##0.00}");
+				statColumn.Add($"{stats.SearchMilliseconds:##0.000}");
+				statColumn.Add($"{stats.SearchMilliseconds * 100.0 / grandTotal:##0.00}");
+				statColumn.Add($"{stats.TotalMilliseconds:##0.000}");
+				statColumn.Add($"{stats.TotalMilliseconds * 100.0 / grandTotal:##0.00}");
+				statColumn.Add($"{stats.TotalMilliseconds * 100.0 / referenceTime:##0.00}");
+				statColumns.Add(statColumn.ToArray());
 			}
 
+			//Calculate maximum display column length
+			int[] maxColumnLengths = Enumerable.Repeat<int>(0, statColumns.Count).ToArray();
+			for (int i = 0; i < statColumns.Count; i++)
+			{
+				for (int j = 0; j < statColumns[i].Length; ++j)
+				{
+					maxColumnLengths[j] = Math.Max(maxColumnLengths[j], statColumns[i][j].Length);
+				}
+			}
+			//Pad values to the left to the max length of that value column
+			for (int i = 0; i < statColumns.Count; i++)
+			{
+				for(int j = 0; j < statColumns[i].Length; ++j)
+				{
+					statColumns[i][j] = statColumns[i][j].PadLeft(maxColumnLengths[j]);
+				}
+			}
+
+			for (int i = 0; i < statColumns.Count; i++)
+			{
+				string[] col = statColumns[i];
+
+				int j = 0;
+				string[] statStrings =
+				{
+					col[j++],
+					$"Init {col[j++]} ms ({col[j++]}%)",
+					$"Search {col[j++]} ms ({col[j++]}%)",
+					$"Total {col[j++]} ms ({col[j++]}%)",
+					$"Ref.% {col[j++]}"
+				};
+				//string[] statStrings =
+				//{
+				//	col[0],
+				//	$"Init {col[1]} ms ({col[2]}%)",
+				//	$"Search {col[3]} ms ({col[4]}%)",
+				//	$"Total {col[5]} ms ({col[6]}%)",
+				//	$"Ref.%{col[7]}"
+				//};
+				Trace.WriteLine(string.Join(verticalSeparator, statStrings.Select(v => string.Concat(v, "")).ToArray()));
+			}
 
 			Trace.WriteLine(lightDivider);
 
-			string grand = string.Join(", ", new string[]
+			string grand = string.Join(System.Environment.NewLine, new string[]
 			{
-				$"GrandInit {grandInit,16:###,###,##0.000}ms",
-				$"GrandSearch {grandSearch,16:###,###,##0.000}ms",
-				$"GrandTotal {grandTotal,16:###,###,##0.000}ms"
+				$"GrandInit   {grandInit,16:###,###,##0.000} ms",
+				$"GrandSearch {grandSearch,16:###,###,##0.000} ms",
+				$"GrandTotal  {grandTotal,16:###,###,##0.000} ms"
 			});
 			Trace.WriteLine(grand);
 
