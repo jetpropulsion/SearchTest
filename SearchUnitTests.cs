@@ -364,6 +364,7 @@ namespace SearchTest
 				}
 
 				int discrepancies = 0;
+				//Iterate over search algorithms ordered by algorithm name
 				foreach (Type key in statistics.Keys.OrderBy(x => x.FullName, StringComparer.Ordinal))
 				{
 					if (key.Equals(referenceType))
@@ -403,8 +404,10 @@ namespace SearchTest
 			Trace.WriteLine(lightDivider);
 
 			int maxName = statistics.Keys.Select(t => t.FullName!.Length).Max();
+
 			IEnumerable<StatTimes> totalsList = statistics.Values.Select(value => new StatTimes(value.InitTime, value.SearchTime, value.InitTime + value.SearchTime));
 			StatTimes grandTotals = totalsList.Aggregate((a, b) => new StatTimes(a.InitTime + b.InitTime, a.SearchTime + b.SearchTime, a.TotalTime + b.TotalTime));
+
 			double grandInit = TimeSpan.FromTicks(grandTotals.InitTime).TotalMilliseconds;
 			double grandSearch = TimeSpan.FromTicks(grandTotals.SearchTime).TotalMilliseconds;
 			double grandTotal = TimeSpan.FromTicks(grandTotals.InitTime + grandTotals.SearchTime).TotalMilliseconds;
@@ -432,6 +435,7 @@ namespace SearchTest
 				statColumn.Add($"{stats.TotalMilliseconds:##0.000}");
 				statColumn.Add($"{stats.TotalMilliseconds * 100.0 / grandTotal:##0.00}");
 				statColumn.Add($"{stats.TotalMilliseconds * 100.0 / referenceTime:##0.00}");
+
 				statColumns.Add(statColumn.ToArray());
 			}
 
@@ -444,6 +448,7 @@ namespace SearchTest
 					maxColumnLengths[j] = Math.Max(maxColumnLengths[j], statColumns[i][j].Length);
 				}
 			}
+
 			//Pad values to the left to the max length of that value column
 			for (int i = 0; i < statColumns.Count; i++)
 			{
@@ -453,6 +458,7 @@ namespace SearchTest
 				}
 			}
 
+			//Statistics for each ISearch instance
 			for (int i = 0; i < statColumns.Count; i++)
 			{
 				string[] col = statColumns[i];
@@ -466,24 +472,18 @@ namespace SearchTest
 					$"Total {col[j++]} ms ({col[j++]}%)",
 					$"Ref.% {col[j++]}"
 				};
-				//string[] statStrings =
-				//{
-				//	col[0],
-				//	$"Init {col[1]} ms ({col[2]}%)",
-				//	$"Search {col[3]} ms ({col[4]}%)",
-				//	$"Total {col[5]} ms ({col[6]}%)",
-				//	$"Ref.%{col[7]}"
-				//};
+
 				Trace.WriteLine(string.Join(verticalSeparator, statStrings.Select(v => string.Concat(v, "")).ToArray()));
 			}
 
 			Trace.WriteLine(lightDivider);
 
+			//Display cumulative timings
 			string grand = string.Join(System.Environment.NewLine, new string[]
 			{
-				$"GrandInit   {grandInit,16:###,###,##0.000} ms",
-				$"GrandSearch {grandSearch,16:###,###,##0.000} ms",
-				$"GrandTotal  {grandTotal,16:###,###,##0.000} ms"
+				$"Grand Init   {grandInit,16:###,###,##0.000} ms",
+				$"Grand Search {grandSearch,16:###,###,##0.000} ms",
+				$"Grand Total  {grandTotal,16:###,###,##0.000} ms"
 			});
 			Trace.WriteLine(grand);
 
