@@ -195,6 +195,108 @@ namespace SearchTest
 		//	bytes = Encoding.UTF8.GetBytes(pattern);
 		//};
 
+		public class PatternGenerator
+		{
+			public int PatternSize { get; protected set; }
+			public int MinPatternSize { get; protected set; }
+			public int MaxPatternSize { get; protected set; }
+
+			public PatternGenerator(int patternSize)
+			{
+				this.MinPatternSize = patternSize;
+				this.MaxPatternSize = patternSize;
+			}
+
+			public PatternGenerator(int minPatternSize, int maxPatternSize)
+			{
+				this.MinPatternSize = minPatternSize;
+				this.MaxPatternSize = maxPatternSize;
+			}
+			public bool IsFixed() => this.MinPatternSize == this.MaxPatternSize;
+
+			public virtual Memory<byte> Next()
+			{
+				ArgumentNullException.ThrowIfNull(this.PatternSize);
+				return Enumerable.Repeat<byte>(0, this.PatternSize).ToArray().AsMemory();
+			}
+		};
+
+		public class RandomPatternGenerator : PatternGenerator
+		{
+			public RandomPatternGenerator(int minPatternSize, int maxPatternSize) : base(minPatternSize, maxPatternSize)
+			{
+				base.PatternSize = GetRandom(minPatternSize, maxPatternSize);
+			}
+			public override Memory<byte> Next()
+			{
+				Memory<byte> pattern = new byte[this.PatternSize];
+				Random.Shared.NextBytes(pattern.Span);
+				return pattern;
+			}
+		};
+
+		public class BufferGenerator
+		{
+			public int BufferSize { get; protected set; }
+			public int MinBufferSize { get; protected set; }
+			public int MaxBufferSize { get; protected set; }
+
+			public BufferGenerator(int bufferSize)
+			{
+				this.MinBufferSize = bufferSize;
+				this.MaxBufferSize = bufferSize;
+			}
+
+			public BufferGenerator(int minBufferSize, int maxBufferSize)
+			{
+				this.MinBufferSize = minBufferSize;
+				this.MaxBufferSize = maxBufferSize;
+			}
+
+			public bool IsFixed() => this.MinBufferSize == this.MaxBufferSize;
+
+			public virtual Memory<byte> Next()
+			{
+				ArgumentNullException.ThrowIfNull(this.BufferSize);
+				return Enumerable.Repeat<byte>(0, this.BufferSize).ToArray().AsMemory();
+			}
+		};
+
+		public class RandomBufferGenerator : BufferGenerator
+		{
+			public RandomBufferGenerator(int minBufferSize, int maxBufferSize) : base(minBufferSize, maxBufferSize)
+			{
+				this.BufferSize = GetRandom(minBufferSize, maxBufferSize);
+			}
+			public override Memory<byte> Next()
+			{
+				Memory<byte> buffer = new byte[this.BufferSize];
+				Random.Shared.NextBytes(buffer.Span);
+				return buffer;
+			}
+		};
+
+		public void CompareOffsets(string firstName, List<int> first, string secondName, List<int> second)
+		{
+			if (first.Count != second.Count || !first.SequenceEqual(second))
+			{
+				IEnumerable<int> intersect = first.Intersect(second);
+				IEnumerable<int> reference = first.Except(intersect);
+				IEnumerable<int> current = second.Except(intersect);
+
+				for (int i = 0; i < first.Count(); ++i)
+				{
+					Trace.WriteLine($"{firstName} only at position {i}: {first.ElementAt(i)}");
+				}
+				for (int i = 0; i < current.Count(); ++i)
+				{
+					Trace.WriteLine($"{secondName} only at position {i}: {current.ElementAt(i)}");
+				}
+
+				Assert.Fail($"{firstName} offsets (Count={first.Count}) not equal to {secondName} offsets (Count={second.Count})");
+			}
+		}
+
 
 		[TestMethod]
 		[Timeout(38400 * 1000)]
@@ -208,7 +310,7 @@ namespace SearchTest
 			Trace.WriteLine(lightDivider);
 
 			const int maxTestIterations = 2;	// 5;	// 10;  // 20;
-			const int maxTestPatterns = 1000; // maximal amount of matching byte sequences, which will be distributed randomly over the buffer
+			const int maxTestPatterns = 10000; // maximal amount of matching byte sequences, which will be distributed randomly over the buffer
 			const int minPatternSize = 3;
 			const int maxPatternSize = 273;
 			const int minBufferSize = 1048576 * 16;
@@ -219,6 +321,7 @@ namespace SearchTest
 			Type referenceType = referenceSearch.GetType();
 
 			Dictionary<Type, SearchStatistics> statistics = new();
+
 			for (int testIteration = 1; testIteration <= maxTestIterations; ++testIteration)
 			{
 				//Clear previous offsets and counters only. Keep accumulated timings.
@@ -226,31 +329,30 @@ namespace SearchTest
 
 				//Generate both search pattern and buffer over which the search is performed from the random data
 				int patternSize = GetRandom(minPatternSize, maxPatternSize);
-				int bufferSize = GetRandom(minBufferSize, maxBufferSize);
-				int safetyMarginSizeInBytes = patternSize;	// 2 zeros are needed for BerryRavindran
-
 				//Generate unique pattern for this iteration from the random data
 				byte[] testPattern = new byte[patternSize];
 				Random.Shared.NextBytes(testPattern);
+				int safetyMarginSizeInBytes = patternSize;  // 2 zeros are needed for BerryRavindran
 
 				//Allocate buffer where searching algorithms will be looking for the pattern
+				int bufferSize = GetRandom(minBufferSize, maxBufferSize);
 				byte[] testBuffer = new byte[bufferSize + safetyMarginSizeInBytes];
 				byte fillByte = testPattern[Random.Shared.Next(minValue: 0, maxValue: patternSize)];
-				Array.Fill<byte>(testBuffer, fillByte, 0, bufferSize);
-				Array.Fill<byte>(testBuffer, 0, bufferSize, safetyMarginSizeInBytes);
-				Array.Copy(testPattern, 0, testBuffer, bufferSize, patternSize);	//only for BackwardFast: copy pattern after the search buffer end
-
-				Trace.WriteLine($"Generator: iteration #{testIteration,5}, fillByte:0x{fillByte:X2}, patternSize:{patternSize,6}, bufferSize:{bufferSize,16:###,###,###,###}, testBuffer.Length:{testBuffer.Length}");
-
-				List<int> testOffsets = new List<int>();
+				Array.Fill<byte>(testBuffer, fillByte, 0, bufferSize);							//fill buffer with fill character
+				Array.Fill<byte>(testBuffer, 0, bufferSize, safetyMarginSizeInBytes);	//clear buffer after the bufferSize boundary to the end (end == bufferSize + patternSize)
+				Array.Copy(testPattern, 0, testBuffer, bufferSize, patternSize);  //only for BackwardFast: copy pattern after the search buffer end
+				Trace.WriteLine($"Generator: fillByte:0x{fillByte:X2}, patternSize:{patternSize,6}, bufferSize:{bufferSize,16:###,###,###,###}");
 
 				int lastSearchableOffset = bufferSize - patternSize;
-				int testOffset = 0;
-				for (int i = 0; i < maxTestPatterns && testOffset + patternSize <= lastSearchableOffset; ++i)
+
+				//generatedOffsets list contains offsets where pattern was randomly inserted
+				List<int> generatedOffsets = new List<int>();
+				int generatedOffset = 0;
+				for (int i = 0; i < maxTestPatterns && generatedOffset + patternSize <= lastSearchableOffset; ++i)
 				{
-					int offset = Random.Shared.Next(testOffset, Math.Min(testOffset + (bufferSize / patternSize), lastSearchableOffset));
-					testOffset = offset + patternSize;	//set next offset start boundary
-					testOffsets.Add(offset);
+					int offset = Random.Shared.Next( generatedOffset, Math.Min(	generatedOffset + (patternSize * 100), lastSearchableOffset	) );
+					generatedOffset = offset + patternSize;	//set next generated offset's start boundary
+					generatedOffsets.Add(offset);
 					testPattern.CopyTo(testBuffer, offset);
 					//Trace.WriteLine($"Generator: inserting at {offset}");
 				}
@@ -260,24 +362,8 @@ namespace SearchTest
 				referenceSearch.Search(testBuffer, 0, bufferSize);
 				referenceOffsets.Sort();
 
-				if (referenceOffsets.Count != testOffsets.Count || !referenceOffsets.SequenceEqual(testOffsets))
-				{
-					IEnumerable<int> intersect = referenceOffsets.Intersect(testOffsets);
-					IEnumerable<int> reference = referenceOffsets.Except(intersect);
-					IEnumerable<int> current = testOffsets.Except(intersect);
-
-					for (int i = 0; i < reference.Count(); ++i)
-					{
-						Trace.WriteLine($"algorithm \"{referenceSearch.GetType().FullName}\" only at position {i}: {reference.ElementAt(i)}");
-					}
-
-					for (int i = 0; i < current.Count(); ++i)
-					{
-						Trace.WriteLine($"test offsets at position {i}: {current.ElementAt(i)}");
-					}
-
-					Assert.Fail($"Reference offsets (Count={referenceOffsets.Count}) not equal to Test offsets (Count={testOffsets.Count})");
-				}
+				//Compare generated vs. reference search gathered offsets
+				CompareOffsets("generated", generatedOffsets, "reference", referenceOffsets);
 
 				Stopwatch initWatch = new();
 				Stopwatch searchWatch = new();
@@ -292,9 +378,11 @@ namespace SearchTest
 				List<Type> blacklistedAttributes = new List<Type>()
 				{
 					typeof(Search.Attributes.UnstableAttribute),
-					typeof(Search.Attributes.ExperimentalAttribute),
+					//typeof(Search.Attributes.ExperimentalAttribute),
 					typeof(Search.Attributes.SlowAttribute),
 				};
+
+				//Automatically instantiate ISearch derivates with Type and custom Attribute filtering
 				foreach (Type type in ((TypeInfo[])asm.DefinedTypes).Select(t => t.UnderlyingSystemType))
 				{
 					//hasMetric equals true if type is inheriting from ISearch interface
@@ -336,15 +424,7 @@ namespace SearchTest
 					initWatch.Restart();
 
 					//Lambda inline function advises search algorithm implementation what is the search pattern and the delegate whic receives the offset when pattern is found.
-					genericSearch.Init
-					(
-						testPattern,
-						(int offset, Type caller) =>
-						{
-							statistics[caller].Offsets.Add(offset);
-							return true;
-						}
-					);
+					genericSearch.Init(testPattern, (int offset, Type caller) => { statistics[caller].Offsets.Add(offset); return true; });
 					//Stop the timer, and increment initialization time statistics
 					initWatch.Stop();
 					_ = statistics[type].IncrementInitializationTime(initWatch.Elapsed.Ticks);
@@ -363,7 +443,7 @@ namespace SearchTest
 					_ = statistics[type].IncrementSearchTime(searchWatch.Elapsed.Ticks);
 				}
 
-				int discrepancies = 0;
+				//int discrepancies = 0;
 				//Iterate over search algorithms ordered by algorithm name
 				foreach (Type key in statistics.Keys.OrderBy(x => x.FullName, StringComparer.Ordinal))
 				{
@@ -374,30 +454,8 @@ namespace SearchTest
 
 					List<int> offsets = statistics[key].Offsets;
 					offsets.Sort();
-					if (offsets.Count != referenceOffsets.Count || !offsets.SequenceEqual(referenceOffsets))
-					{
-						++discrepancies;
-						Trace.WriteLine($"results of the algorithm run \"{key}\" differs from brute force");
 
-						IEnumerable<int> intersect = referenceOffsets.Intersect(offsets);
-						IEnumerable<int> reference = referenceOffsets.Except(intersect);
-						IEnumerable<int> current = offsets.Except(intersect);
-
-						for (int i = 0; i < reference.Count(); ++i)
-						{
-							Trace.WriteLine($"algorithm \"{referenceSearch.GetType().FullName}\" only at position {i}: {reference.ElementAt(i)}");
-						}
-
-						for (int i = 0; i < current.Count(); ++i)
-						{
-							Trace.WriteLine($"algorithm \"{key.FullName}\" match at position {i}: {current.ElementAt(i)}");
-						}
-					}
-				}
-				if (discrepancies != 0)
-				{
-					Debug.WriteLine($"Total {discrepancies} discrepancies.");
-					Assert.Fail();
+					CompareOffsets("generic", offsets, "reference", referenceOffsets);
 				}
 			} //END: for(int testIteration
 
