@@ -116,7 +116,6 @@
 		{
 			bufferSize = Random.Shared.Next(minBufferSize, maxBufferSize + 1);
 			buffer = new byte[bufferSize + safetyMargin];
-			Array.Fill<byte>(buffer, 0, 0, buffer.Length);
 		}
 
 		public static void DefaultBufferFill(ref byte[] buffer, int bufferSize)

@@ -174,6 +174,7 @@ namespace SearchTest
 
 			//Dictionary of Type (which must inherit from ISearch) and its measured searcj statistics
 			Dictionary<Type, SearchStatistics> statistics = new();
+			Dictionary<Type, SearchStatistics[]> detailedStatistics = new();
 
 			//Blacklists
 			HashSet<Type> blacklistedTypes = new HashSet<Type>()
@@ -204,16 +205,20 @@ namespace SearchTest
 				{
 					statistics.Add(type, new SearchStatistics());
 				}
+				if (!detailedStatistics.ContainsKey(type))
+				{
+					detailedStatistics.Add(type, new SearchStatistics[ SearchTests.Count ]);
+				}
 			}
 
 			Type[] searchTypes = statistics.Keys.Select(x => x).OrderBy(x => x.FullName, StringComparer.Ordinal).ToArray();
 
-			for (int i = 0; i < SearchTests.Count; ++i)
+			for (int testIteration = 0; testIteration < SearchTests.Count; ++testIteration)
 			{
-				SearchTestParams test = SearchTests[i];
+				SearchTestParams test = SearchTests[testIteration];
 				string testName = test.Name;
 
-				for (int testIteration = 1; testIteration <= test.MaxIterations; ++testIteration)
+				for (int testSubIteration = 1; testSubIteration <= test.MaxIterations; ++testSubIteration)
 				{
 					test.Reset();
 
@@ -228,7 +233,7 @@ namespace SearchTest
 
 					Trace.WriteLine
 					(
-						$"{test.Name.PadRight(30)}#{testIteration}/{test.MaxIterations,-3}:"
+						$"{test.Name.PadRight(30)}#{testSubIteration}/{test.MaxIterations,-3}:"
 						+ $" {nameof(patternSize)}={patternSize,16}"
 						+ $", {nameof(bufferSize)}={bufferSize,16}"
 						+ $", {nameof(referenceOffsets)}={referenceOffsets.Count,16}"
@@ -265,7 +270,9 @@ namespace SearchTest
 
 						//Stop the timer, and increment initialization time statistics
 						initWatch.Stop();
-						_ = statistics[type].IncrementInitializationTime(initWatch.Elapsed.Ticks);
+						long elapsedInit = initWatch.Elapsed.Ticks;
+						_ = statistics[type].IncrementInitializationTime(elapsedInit);
+						_ = detailedStatistics[type][testIteration].IncrementInitializationTime(elapsedInit);
 
 						//Accumulate duration of search for each generic search algorithm
 						searchWatch.Restart();
@@ -278,7 +285,9 @@ namespace SearchTest
 							Assert.Fail($"[SEARCH EXCEPTION] Type={type}, Details:{ex}", ex);
 						}
 						searchWatch.Stop();
-						_ = statistics[type].IncrementSearchTime(searchWatch.Elapsed.Ticks);
+						long elapsedSearch = searchWatch.Elapsed.Ticks;
+						_ = statistics[type].IncrementSearchTime(elapsedSearch);
+						_ = detailedStatistics[type][testIteration].IncrementSearchTime(elapsedSearch);
 
 						//Check if offsets of the found pattern returned by generic algorithm is equal to reference offsets of the pattern
 						if (!type.Equals(referenceSearchType))
@@ -290,8 +299,8 @@ namespace SearchTest
 						}
 						//Trace.WriteLine($"{type.FullName}: Init={initWatch.Elapsed.Ticks}, Search={searchWatch.Elapsed.Ticks}");
 					} //END: foreach (Type type in searchTypes)
-				} //END: for (int testIteration = 1; testIteration <= test.MaxIterations; ++testIteration)
-			} //END: for (int i = 0; i < SearchTests.Count; ++i)
+				} //END: for (int testSubIteration = 1; testSubIteration <= test.MaxIterations; ++testSubIteration)
+			} //END: for (int testIteration = 0; testIteration < SearchTests.Count; ++testIteration)
 
 			Trace.WriteLine(lightDivider);
 
