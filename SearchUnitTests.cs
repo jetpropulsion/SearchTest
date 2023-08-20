@@ -4,6 +4,7 @@ namespace SearchTest
 {
 	using Microsoft.Extensions.FileSystemGlobbing.Internal.Patterns;
 	using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+
 	using Newtonsoft.Json.Linq;
 
 	using Search.Interfaces;
@@ -92,13 +93,8 @@ namespace SearchTest
 
 		public record StatTimes(long InitTime, long SearchTime, long TotalTime);
 
-
-		public static int GetRandom(int min, int max) => Random.Shared.Next(min, max);
-		public static void GetRandomBytes(ref byte[] bytes) => Random.Shared.NextBytes(bytes);
-
-
 		//Method will terminate execution if offset collections are different
-		public static bool AssertEqualOffsets(string firstName, ICollection<int> first, string secondName, ICollection<int> second)
+		public static bool EqualOffsets(string firstName, ICollection<int> first, string secondName, ICollection<int> second)
 		{
 			if (first.Count == second.Count && first.SequenceEqual(second))
 			{
@@ -109,9 +105,9 @@ namespace SearchTest
 			IEnumerable<int> reference = first.Except(intersect);
 			IEnumerable<int> current = second.Except(intersect);
 
-			for (int i = 0; i < first.Count(); ++i)
+			for (int i = 0; i < reference.Count(); ++i)
 			{
-				Trace.WriteLine($"{firstName} only at position {i}: {first.ElementAt(i)}");
+				Trace.WriteLine($"{firstName} only at position {i}: {reference.ElementAt(i)}");
 			}
 			for (int i = 0; i < current.Count(); ++i)
 			{
@@ -121,127 +117,46 @@ namespace SearchTest
 		}
 
 
-		public class SearchTest
+		public List<SearchTestParams> SearchTests = new List<SearchTestParams>()
 		{
-			public SearchTest
+			new SearchTestParams
 			(
-				string name,
-				int minPatternSize, int maxPatternSize,
-				int minBufferSize, int maxBufferSize,
-				int minDistance, int maxDistance
-			)
-			{
-				this.Name = name;
-
-				this.MinPatternSize = minPatternSize;
-				this.MaxPatternSize = maxPatternSize;
-				this.MinBufferSize = minBufferSize;
-				this.MaxBufferSize = maxBufferSize;
-				this.MinDistance = minDistance;
-				this.MaxDistance = maxDistance;
-
-				this.PatternGenerator(minPatternSize, maxPatternSize, out this.PatternSize, out this.Pattern);
-				this.BufferGenerator(minBufferSize, maxBufferSize, this.PatternSize, out this.BufferSize, out this.Buffer);
-			}
-			public string Name;
-			public int MinPatternSize;
-			public int MaxPatternSize;
-			public int MinBufferSize;
-			public int MaxBufferSize;
-			public int MinDistance;
-			public int MaxDistance;
-
-			public int PatternSize;
-			public int BufferSize;
-			public byte[] Pattern;
-			public byte[] Buffer;
-
-			public delegate void OffsetGeneratorDelegate(int bufferSize, int patternSize, int minDistance, int maxDistance, out int[] offsets);
-			public delegate void PatternGeneratorDelegate(int minPatternSize, int maxPatternSize, out int patternSize, out byte[] pattern);
-			public delegate void BufferGeneratorDelegate(int minBufferSize, int maxBufferSize, int safetyMargin, out int bufferSize, out byte[] buffer);
-			public delegate void BufferFillDelegate(ref byte[] buffer, int bufferSize, byte fill);
-			public delegate void BufferPatternFillDelegate(ref byte[] buffer, int bufferSize, in byte[] pattern, in IReadOnlyList<int> offsets);
-
-			public OffsetGeneratorDelegate OffsetGenerator = DefaultOffsetGenerator;
-			public PatternGeneratorDelegate PatternGenerator = DefaultPatternGenerator;
-			public BufferGeneratorDelegate BufferGenerator = DefaultBufferGenerator;
-			public BufferFillDelegate BufferFill = DefaultBufferFill;
-			public BufferPatternFillDelegate BufferPatternFill = DefaultBufferPatternFill;
-
-			public static void DefaultOffsetGenerator(int bufferSize, int patternSize, int minDistance, int maxDistance, out int[] offsets)
-			{
-				int lastOffset = bufferSize - patternSize;
-
-				List<int> result = new List<int>();
-
-				int next = 0;
-				while (next <= lastOffset)
-				{
-					int distance = Random.Shared.Next(minDistance, maxDistance);
-					int nextMax = Math.Min(next + distance, lastOffset);
-					int offset = Random.Shared.Next(next, nextMax);
-					result.Add(offset);
-					next = offset + patternSize; //set next generated offset's start boundary
-				}
-				//result.Sort();	//NOTE: do not sort - this allows overlapping strings
-				offsets = result.ToArray();
-			}
-
-			public static void DefaultPatternGenerator(int minPatternSize, int maxPatternSize, out int patternSize, out byte[] pattern)
-			{
-				patternSize = Random.Shared.Next(minPatternSize, maxPatternSize);
-				pattern = new byte[patternSize];
-				Random.Shared.NextBytes(pattern);
-			}
-
-			public static void DefaultBufferGenerator(int minBufferSize, int maxBufferSize, int safetyMargin, out int bufferSize, out byte[] buffer)
-			{
-				bufferSize = Random.Shared.Next(minBufferSize, maxBufferSize);
-				buffer = new byte[bufferSize + safetyMargin];
-				Array.Fill<byte>(buffer, 0, 0, buffer.Length);
-			}
-
-			public static void DefaultBufferFill(ref byte[] buffer, int bufferSize, byte value)
-			{
-				Assert.IsTrue(buffer.Length >= bufferSize);
-				Random.Shared.NextBytes(buffer[0..bufferSize]);
-			}
-
-			public static void DefaultBufferPatternFill(ref byte[] buffer, int bufferSize, in byte[] pattern, in IReadOnlyList<int> offsets)
-			{
-				Assert.IsTrue(buffer.Length >= bufferSize);
-
-				int patternSize = pattern.Length;
-				for (int i = 0; i < offsets.Count; i++)
-				{
-					int offset = offsets[i];
-					Assert.IsTrue(offset + patternSize <= bufferSize - patternSize);
-					pattern.CopyTo(buffer, offset);
-				}
-			}
-
-		};  //END: class SearchTestParams
-
-		public List<SearchTest> SearchTests = new List<SearchTest>()
-		{
-			new SearchTest
-			(
-				name: "Standard",
+				name: "BackgroundIsPatternMinus1",
+				maxTestIterations: 5,
 				minPatternSize: 3,
 				maxPatternSize: 273,
 				minBufferSize: 1048576 * 16,
 				maxBufferSize: 1048576 * 16 * 24,
-				minDistance: 0,
-				maxDistance: 1048576
-				//PatternGenerator: (int, int, out int patternSize, out byte[] pattern) = (minPatternSize, maxPatternSize, patternSize, pattern) =>
-				//{
-
-				//}
+				minDistance: 1,
+				maxDistance: 273,
+				bufferPatternFill: SearchTestParams.PatternMinusOneBufferPatternFill
+			),
+			new SearchTestParams
+			(
+				name: "StandardDistanceAndPattern",
+				maxTestIterations: 5,
+				minPatternSize: 3,
+				maxPatternSize: 273,
+				minBufferSize: 1048576 * 16,
+				maxBufferSize: 1048576 * 16 * 24,
+				minDistance: 256,
+				maxDistance: 65536
+			),
+			new SearchTestParams
+			(
+				name: "SmallDistanceSmallPattern",
+				maxTestIterations: 5,
+				minPatternSize: 3,
+				maxPatternSize: 10,
+				minBufferSize: 1048576 * 16,
+				maxBufferSize: 1048576 * 16 * 24,
+				minDistance: 2,
+				maxDistance: 127
 			)
 		};
 
 		[TestMethod]
-		[Timeout(38400 * 1000)]
+		[Timeout(86400 * 365)]    //Test timeout is one year
 		public void Test_All_ISearch_Derivates()
 		{
 			Trace.AutoFlush = true;
@@ -252,162 +167,131 @@ namespace SearchTest
 			Trace.WriteLine(heavyDivider);
 			Trace.WriteLine(lightDivider);
 
-			//const double timeUpscaling = 1000.0;
-			//const double timeDownscaling = 0.001;
-
-			const int maxTestIterations = 2;	// 5;	// 10;  // 20;
 
 			//Reference search algorithm is now BruteForce, choosen over its simplicity (and slowness)
 			ISearch referenceSearch = new Search.Algorithms.BruteForce();
 			Type referenceSearchType = referenceSearch.GetType();
 
+			//Dictionary of Type (which must inherit from ISearch) and its measured searcj statistics
 			Dictionary<Type, SearchStatistics> statistics = new();
 
-			for (int testIteration = 1; testIteration <= maxTestIterations; ++testIteration)
+			//Blacklists
+			HashSet<Type> blacklistedTypes = new HashSet<Type>()
 			{
-				//Clear previous offsets and counters only. Keep accumulated timings.
-				statistics.Keys.ToList().ForEach(k => statistics[k].Offsets.Clear());
-
-				const int minPatternSize = 3;
-				const int maxPatternSize = 273;
-				//Generate both search pattern and buffer over which the search is performed from the random data
-				int patternSize = GetRandom(minPatternSize, maxPatternSize);
-				//Generate unique pattern for this iteration from the random data
-				byte[] testPattern = new byte[patternSize];
-				Random.Shared.NextBytes(testPattern);
-				int safetyMarginSizeInBytes = patternSize;  // 2 zeros are needed for BerryRavindran, patternSize for MaximalShift and BackwardFast
-
-				const int minBufferSize = 1048576 * 16;
-				const int maxBufferSize = minBufferSize * 24;
-				//Allocate buffer where searching algorithms will be looking for the pattern
-				int bufferSize = GetRandom(minBufferSize, maxBufferSize);
-				byte[] testBuffer = new byte[bufferSize + safetyMarginSizeInBytes];
-
-				//Fill buffer
-				byte fillByte = testPattern[Random.Shared.Next(minValue: 0, maxValue: patternSize)];
-				Array.Fill<byte>(testBuffer, fillByte, 0, bufferSize);							//fill buffer with fill character
-				Array.Fill<byte>(testBuffer, 0, bufferSize, safetyMarginSizeInBytes);	//clear buffer after the bufferSize boundary to the end (end == bufferSize + patternSize)
-				Array.Copy(testPattern, 0, testBuffer, bufferSize, patternSize);  //only for BackwardFast: copy pattern after the search buffer end
-
-
-				int lastOffset = bufferSize - patternSize;
-				const int maxTestPatterns = int.MaxValue; //10000; // maximal amount of matching byte sequences, which will be distributed randomly over the buffer
-				//generatedOffsets list contains offsets where pattern was randomly inserted
-				List<int> generatedOffsets = new List<int>();
-				int generatedOffset = 0;
-				int minDistance = 0;
-				int maxDistance = 1024; //65536;	// bufferSize / patternSize;	//4096
-				for (int i = 0; i < maxTestPatterns && generatedOffset + patternSize <= lastOffset; ++i)
+				typeof(Search.Common.SearchBase)
+			};
+			List<Type> blacklistedAttributes = new List<Type>()
+			{
+				typeof(Search.Attributes.UnstableAttribute),
+				//typeof(Search.Attributes.ExperimentalAttribute),
+				typeof(Search.Attributes.SlowAttribute),
+			};
+			foreach (Type type in ((TypeInfo[])assembly.DefinedTypes).Select(t => t.UnderlyingSystemType))
+			{
+				if
+				(
+					!type.IsClass                                                           //Skip if type is not a class
+					|| type.IsAbstract                                                      //Skip if type is an abstract class
+					|| !type.GetInterfaces().Contains(typeof(Search.Interfaces.ISearch))    //Skip if type doesn't implement ISearch
+					|| blacklistedTypes.Contains(type)                                      //Skip blacklisted types, like base classes
+					|| blacklistedAttributes.Any(x => type.IsDefined(x))                //Skip search algorithm class if marked with blacklisted Attribute
+				)
 				{
-					int distance = Random.Shared.Next(minDistance, maxDistance);
-					int offset = Random.Shared.Next( generatedOffset, Math.Min(	generatedOffset + distance, lastOffset	) );
-					generatedOffset = offset + patternSize;	//set next generated offset's start boundary
-					generatedOffsets.Add(offset);
-					testPattern.CopyTo(testBuffer, offset);
-					//Trace.WriteLine($"Generator: inserting at {offset.ToString().PadLeft(16)}, distance is {distance.ToString().PadLeft(16)}");
+					continue;
 				}
-				Trace.WriteLine($"Generator: fillByte:0x{fillByte:X2}, patternSize:{patternSize,6}, bufferSize:{bufferSize,16:###,###,###,###}, offsetCount={generatedOffsets.Count}");
-
-				List<int> referenceOffsets = new List<int>();
-				referenceSearch.Init(testPattern, (int offset, Type caller) => { referenceOffsets.Add(offset); return true; });
-				referenceSearch.Search(testBuffer, 0, bufferSize);
-				//referenceOffsets.Sort();
-/*
-				//Compare generated vs. reference search gathered offsets
-				//NOTE: this check should be skipped, if overlapping test strings are used
-				if(!AssertEqualOffsets("generated", generatedOffsets, "reference", referenceOffsets))
+				//If statistics context doesn't contain SearchStatistics object, this is the first occurence, add new one
+				if (!statistics.ContainsKey(type))
 				{
-					Assert.Fail($"{nameof(generatedOffsets)} (Count={generatedOffsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
+					statistics.Add(type, new SearchStatistics());
 				}
-*/
-				Stopwatch initWatch = new();
-				Stopwatch searchWatch = new();
+			}
 
-				//Blacklists
-				HashSet<Type> blacklistedTypes = new HashSet<Type>()
+			Type[] searchTypes = statistics.Keys.Select(x => x).OrderBy(x => x.FullName, StringComparer.Ordinal).ToArray();
+
+			for (int i = 0; i < SearchTests.Count; ++i)
+			{
+				SearchTestParams test = SearchTests[i];
+				string testName = test.Name;
+
+				for (int testIteration = 1; testIteration <= test.MaxIterations; ++testIteration)
 				{
-					typeof(Search.Common.SearchBase)					//Skip SearchBase itself (TODO?: use IsInherited)
-				};
-				List<Type> blacklistedAttributes = new List<Type>()
-				{
-					typeof(Search.Attributes.UnstableAttribute),
-					//typeof(Search.Attributes.ExperimentalAttribute),
-					typeof(Search.Attributes.SlowAttribute),
-				};
+					test.Reset();
 
-				foreach(Type type in ((TypeInfo[])assembly.DefinedTypes).Select(t => t.UnderlyingSystemType))
-				{
-					//hasMetric equals true if type is inheriting from ISearch interface
-					bool hasMetric = type.GetInterfaces().Contains(typeof(Search.Interfaces.ISearch));
+					ReadOnlyMemory<byte> testPattern = test.Pattern;
+					ReadOnlyMemory<byte> testBuffer = test.Buffer;
+					int patternSize = test.PatternSize;
+					int bufferSize = test.BufferSize;
 
-					//Skip if type is not a class, or it is an abstract class, or has no implemented ISearch interface
-					if (!type.IsClass || type.IsAbstract || !hasMetric)
+					List<int> referenceOffsets = new List<int>();
+					referenceSearch.Init(testPattern, (int offset, Type caller) => { referenceOffsets.Add(offset); return true; });
+					referenceSearch.Search(testBuffer, 0, bufferSize);
+
+					Trace.WriteLine
+					(
+						$"{test.Name.PadRight(30)}#{testIteration}/{test.MaxIterations,-3}:"
+						+ $" {nameof(patternSize)}={patternSize,16}"
+						+ $", {nameof(bufferSize)}={bufferSize,16}"
+						+ $", {nameof(referenceOffsets)}={referenceOffsets.Count,16}"
+						+ $" @ {DateTime.Now.ToString(@"yyyy-MM-dd HH:mm:ss.ffffzzz")}"
+					);
+
+					/*
+					//Compare generated vs. reference search gathered offsets
+					//NOTE: this check should be skipped, if overlapping test strings or randomly generated sequences are used
+					if(!EqualOffsets("generated", generatedOffsets, "reference", referenceOffsets))
 					{
-						continue;
+						Assert.Fail($"{nameof(generatedOffsets)} (Count={generatedOffsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
 					}
+					*/
 
-					//Skip blacklisted tyoes, like base classes
-					if (blacklistedTypes.Contains(type))
+					Stopwatch initWatch = new();
+					Stopwatch searchWatch = new();
+
+					//Clear previous offsets and counters only. Keep accumulated timings.
+					statistics.Keys.ToList().ForEach(k => statistics[k].Offsets.Clear());
+
+					//Automatically instantiate ISearch derivates with Type and custom Attribute filtering
+					foreach (Type type in searchTypes)
 					{
-						continue;
-					}
+						//Create instance of generic search algorithm exposing ISearch interface
+						Assembly searchAssembly = type.Assembly;
+						ISearch genericSearch = (ISearch)(searchAssembly.CreateInstance(type.FullName!, false) ?? throw new ApplicationException(type.FullName));
 
-					//Skip search algorithm class if marked with blacklisted Attribute
-					if (blacklistedAttributes.Any(x => type.IsDefined(x)))
-					{
-						continue;
-					}
+						//Accumulate duration of initialization for each generic search algorithm
+						initWatch.Restart();
 
-					//If statistics context doesn't contain SearchStatistics object, this is the first occurence, add new one
-					if (!statistics.ContainsKey(type))
-					{
-						statistics.Add(type, new SearchStatistics());
-					}
-				}
+						//Lambda inline function advises search algorithm implementation what is the search pattern and the delegate whic receives the offset when pattern is found.
+						genericSearch.Init(testPattern, (int offset, Type caller) => { statistics[caller].Offsets.Add(offset); return true; });
 
-				Type[] searchTypes = statistics.Keys.Select(x => x).OrderBy(x => x.FullName, StringComparer.Ordinal).ToArray();
+						//Stop the timer, and increment initialization time statistics
+						initWatch.Stop();
+						_ = statistics[type].IncrementInitializationTime(initWatch.Elapsed.Ticks);
 
-				//Automatically instantiate ISearch derivates with Type and custom Attribute filtering
-				foreach (Type type in searchTypes)
-				{
-					//Create instance of generic search algorithm exposing ISearch interface
-					Assembly searchAssembly = type.Assembly;
-					ISearch genericSearch = (ISearch)(searchAssembly.CreateInstance(type.FullName!, false) ?? throw new ApplicationException(type.FullName));
-
-					//Accumulate duration of initialization for each generic search algorithm
-					initWatch.Restart();
-
-					//Lambda inline function advises search algorithm implementation what is the search pattern and the delegate whic receives the offset when pattern is found.
-					genericSearch.Init(testPattern, (int offset, Type caller) => { statistics[caller].Offsets.Add(offset); return true; });
-
-					//Stop the timer, and increment initialization time statistics
-					initWatch.Stop();
-					_ = statistics[type].IncrementInitializationTime(initWatch.Elapsed.Ticks);
-
-					//Accumulate duration of search for each generic search algorithm
-					searchWatch.Restart();
-					try
-					{
-						genericSearch.Search(testBuffer, 0, bufferSize);
-					}
-					catch (Exception ex)
-					{
-						Assert.Fail($"[SEARCH EXCEPTION] Type={type}, Details:{ex}", ex);
-					}
-					searchWatch.Stop();
-					_ = statistics[type].IncrementSearchTime(searchWatch.Elapsed.Ticks);
-
-					//Check if offsets of the found pattern returned by generic algorithm is equal to reference offsets of the pattern
-					if (!type.Equals(referenceSearchType))
-					{
-						if (!AssertEqualOffsets("generic", statistics[type].Offsets, "reference", referenceOffsets))
+						//Accumulate duration of search for each generic search algorithm
+						searchWatch.Restart();
+						try
 						{
-							Assert.Fail($"generic (Count={statistics[type].Offsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
+							genericSearch.Search(testBuffer, 0, bufferSize);
 						}
-					}
-				}
+						catch (Exception ex)
+						{
+							Assert.Fail($"[SEARCH EXCEPTION] Type={type}, Details:{ex}", ex);
+						}
+						searchWatch.Stop();
+						_ = statistics[type].IncrementSearchTime(searchWatch.Elapsed.Ticks);
 
-			} //END: for(int testIteration
+						//Check if offsets of the found pattern returned by generic algorithm is equal to reference offsets of the pattern
+						if (!type.Equals(referenceSearchType))
+						{
+							if (!EqualOffsets("generic", statistics[type].Offsets, "reference", referenceOffsets))
+							{
+								Assert.Fail($"generic (Count={statistics[type].Offsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
+							}
+						}
+						//Trace.WriteLine($"{type.FullName}: Init={initWatch.Elapsed.Ticks}, Search={searchWatch.Elapsed.Ticks}");
+					} //END: foreach (Type type in searchTypes)
+				} //END: for (int testIteration = 1; testIteration <= test.MaxIterations; ++testIteration)
+			} //END: for (int i = 0; i < SearchTests.Count; ++i)
 
 			Trace.WriteLine(lightDivider);
 
@@ -421,10 +305,12 @@ namespace SearchTest
 			double grandTotal = TimeSpan.FromTicks(grandTotals.InitTime + grandTotals.SearchTime).TotalMilliseconds;
 
 			string verticalSeparator = string.Concat(" ", stringLightVerticalLine, " ");
-
-			List<string[]> statColumns = new List<string[]>();
 			double referenceTime = statistics[referenceSearchType].TotalMilliseconds;
 			const string stringRef = @" [Ref]";
+
+			List<string[]> statColumns = new List<string[]>();
+			statColumns.Clear();
+
 			//Write test report, ordered by Total time (Initialization + Search)
 			foreach (Type type in statistics.Keys.OrderBy(t => statistics[t].InitTime + statistics[t].SearchTime))
 			{
@@ -432,7 +318,7 @@ namespace SearchTest
 
 				List<string> statColumn = new List<string>();
 
-				if(type.Equals(referenceSearchType))
+				if (type.Equals(referenceSearchType))
 				{ statColumn.Add(string.Concat(type.FullName!, stringRef).PadRight(maxName + stringRef.Length)); }
 				else
 				{ statColumn.Add(type.FullName!.PadRight(maxName + stringRef.Length)); }
@@ -461,7 +347,7 @@ namespace SearchTest
 			//Pad values to the left to the max length of that value column
 			for (int i = 0; i < statColumns.Count; i++)
 			{
-				for(int j = 0; j < statColumns[i].Length; ++j)
+				for (int j = 0; j < statColumns[i].Length; ++j)
 				{
 					statColumns[i][j] = statColumns[i][j].PadLeft(maxColumnLengths[j]);
 				}
