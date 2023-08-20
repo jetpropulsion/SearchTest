@@ -207,7 +207,11 @@ namespace SearchTest
 				}
 				if (!detailedStatistics.ContainsKey(type))
 				{
-					detailedStatistics.Add(type, new SearchStatistics[ SearchTests.Count ]);
+					detailedStatistics.Add(type, new SearchStatistics[SearchTests.Count]);
+					for(int i = 0; i < detailedStatistics[type].Length; ++i)
+					{
+						detailedStatistics[type][i] = new SearchStatistics();
+					}
 				}
 			}
 
@@ -313,72 +317,77 @@ namespace SearchTest
 			double grandSearch = TimeSpan.FromTicks(grandTotals.SearchTime).TotalMilliseconds;
 			double grandTotal = TimeSpan.FromTicks(grandTotals.InitTime + grandTotals.SearchTime).TotalMilliseconds;
 
-			string verticalSeparator = string.Concat(" ", stringLightVerticalLine, " ");
-			double referenceTime = statistics[referenceSearchType].TotalMilliseconds;
-			const string stringRef = @" [Ref]";
-
-			List<string[]> statColumns = new List<string[]>();
-			statColumns.Clear();
-
-			//Write test report, ordered by Total time (Initialization + Search)
-			foreach (Type type in statistics.Keys.OrderBy(t => statistics[t].InitTime + statistics[t].SearchTime))
+			Action<Dictionary<Type, SearchStatistics>, Type, double> WriteStats = (statistics, referenceSearchType, grandTotal) =>
 			{
-				SearchStatistics stats = statistics[type];
+				double referenceTime = statistics[referenceSearchType].TotalMilliseconds;
+				const string stringRef = @" [Ref]";
 
-				List<string> statColumn = new List<string>();
+				List<string[]> statColumns = new List<string[]>();
+				statColumns.Clear();
 
-				if (type.Equals(referenceSearchType))
-				{ statColumn.Add(string.Concat(type.FullName!, stringRef).PadRight(maxName + stringRef.Length)); }
-				else
-				{ statColumn.Add(type.FullName!.PadRight(maxName + stringRef.Length)); }
-
-				statColumn.Add($"{stats.InitMilliseconds:##0.000}");
-				statColumn.Add($"{stats.InitMilliseconds * 100.0 / grandTotal:##0.00}");
-				statColumn.Add($"{stats.SearchMilliseconds:##0.000}");
-				statColumn.Add($"{stats.SearchMilliseconds * 100.0 / grandTotal:##0.00}");
-				statColumn.Add($"{stats.TotalMilliseconds:##0.000}");
-				statColumn.Add($"{stats.TotalMilliseconds * 100.0 / grandTotal:##0.00}");
-				statColumn.Add($"{stats.TotalMilliseconds * 100.0 / referenceTime:##0.00}");
-
-				statColumns.Add(statColumn.ToArray());
-			}
-
-			//Calculate maximum display column length
-			int[] maxColumnLengths = Enumerable.Repeat<int>(0, statColumns.Count).ToArray();
-			for (int i = 0; i < statColumns.Count; i++)
-			{
-				for (int j = 0; j < statColumns[i].Length; ++j)
+				//Write test report, ordered by Total time (Initialization + Search)
+				foreach (Type type in statistics.Keys.OrderBy(t => statistics[t].InitTime + statistics[t].SearchTime))
 				{
-					maxColumnLengths[j] = Math.Max(maxColumnLengths[j], statColumns[i][j].Length);
+					SearchStatistics stats = statistics[type];
+
+					List<string> statColumn = new List<string>();
+
+					if (type.Equals(referenceSearchType))
+					{ statColumn.Add(string.Concat(type.FullName!, stringRef).PadRight(maxName + stringRef.Length)); }
+					else
+					{ statColumn.Add(type.FullName!.PadRight(maxName + stringRef.Length)); }
+
+					statColumn.Add($"{stats.InitMilliseconds:##0.000}");
+					statColumn.Add($"{stats.InitMilliseconds * 100.0 / grandTotal:##0.00}");
+					statColumn.Add($"{stats.SearchMilliseconds:##0.000}");
+					statColumn.Add($"{stats.SearchMilliseconds * 100.0 / grandTotal:##0.00}");
+					statColumn.Add($"{stats.TotalMilliseconds:##0.000}");
+					statColumn.Add($"{stats.TotalMilliseconds * 100.0 / grandTotal:##0.00}");
+					statColumn.Add($"{stats.TotalMilliseconds * 100.0 / referenceTime:##0.00}");
+
+					statColumns.Add(statColumn.ToArray());
 				}
-			}
 
-			//Pad values to the left to the max length of that value column
-			for (int i = 0; i < statColumns.Count; i++)
-			{
-				for (int j = 0; j < statColumns[i].Length; ++j)
+				//Calculate maximum display column length
+				int[] maxColumnLengths = Enumerable.Repeat<int>(0, statColumns.Count).ToArray();
+				for (int i = 0; i < statColumns.Count; i++)
 				{
-					statColumns[i][j] = statColumns[i][j].PadLeft(maxColumnLengths[j]);
+					for (int j = 0; j < statColumns[i].Length; ++j)
+					{
+						maxColumnLengths[j] = Math.Max(maxColumnLengths[j], statColumns[i][j].Length);
+					}
 				}
-			}
 
-			//Statistics for each ISearch instance
-			for (int i = 0; i < statColumns.Count; i++)
-			{
-				string[] col = statColumns[i];
-
-				int j = 0;
-				string[] statStrings =
+				//Pad values to the left to the max length of that value column
+				for (int i = 0; i < statColumns.Count; i++)
 				{
-					col[j++],
-					$"Init {col[j++]} ms ({col[j++]}%)",
-					$"Search {col[j++]} ms ({col[j++]}%)",
-					$"Total {col[j++]} ms ({col[j++]}%)",
-					$"Ref.% {col[j++]}"
-				};
+					for (int j = 0; j < statColumns[i].Length; ++j)
+					{
+						statColumns[i][j] = statColumns[i][j].PadLeft(maxColumnLengths[j]);
+					}
+				}
 
-				Trace.WriteLine(string.Join(verticalSeparator, statStrings.Select(v => string.Concat(v, "")).ToArray()));
-			}
+				//Statistics for each ISearch instance
+				for (int i = 0; i < statColumns.Count; i++)
+				{
+					string[] col = statColumns[i];
+
+					int j = 0;
+					string[] statStrings =
+					{
+						col[j++],
+						$"Init {col[j++]} ms ({col[j++]}%)",
+						$"Search {col[j++]} ms ({col[j++]}%)",
+						$"Total {col[j++]} ms ({col[j++]}%)",
+						$"Ref.% {col[j++]}"
+					};
+
+					string verticalSeparator = string.Concat(" ", stringLightVerticalLine, " ");
+					Trace.WriteLine(string.Join(verticalSeparator, statStrings.Select(v => string.Concat(v, "")).ToArray()));
+				}
+			};  //END: Action<Dictionary<Type, SearchStatistics>, Type, double> WriteStats
+
+			WriteStats(statistics, referenceSearchType, grandTotal);
 
 			Trace.WriteLine(lightDivider);
 
