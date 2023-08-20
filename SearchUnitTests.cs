@@ -14,33 +14,11 @@ namespace SearchTest
 	using System.Diagnostics;
 	using System.Reflection;
 	using System.Text;
+	using System.Xml.Linq;
 
 	[TestClass]
 	public class SearchUnitTests
 	{
-		private const string pattern = "456";
-		private const string buffer = "12345678.......abcdef.......123456..#@%45/////..........456455////////4$$$$$////////////456";
-		private static readonly Memory<byte> patternMemory = Encoding.UTF8.GetBytes(pattern).AsMemory();
-		private static readonly Memory<byte> bufferMemory = Encoding.UTF8.GetBytes(buffer).AsMemory();
-		private static readonly List<int> simpleExpectedOffsets = new() { 3, 31, 56, 88 };
-		private static readonly ConcurrentDictionary<Type, List<int>> resultsMap = new();
-
-		public static List<int> createOffsets(Type type, int offset) => new() { offset };
-		public static List<int> appendOffsets(Type type, List<int> offsets, int offset)
-		{
-			int[] result = new int[offsets.Count + 1];
-			offsets.CopyTo(result, 0);
-			result[offsets.Count] = offset;
-			return result.ToList();
-		}
-		public static bool DisplayOffset(int offset, Type caller)
-		{
-			_ = resultsMap.AddOrUpdate<int>(caller, createOffsets, appendOffsets, offset);
-
-			//Trace.WriteLine($"({caller.FullName}) has found \"{pattern}\" at offset: {offset}");
-			return true;
-		}
-
 		/*****************************************************************************************************************
 		*******************************************************************************************************************
 		*** Changes for Visual Studio 2022
@@ -154,6 +132,84 @@ namespace SearchTest
 				maxDistance: 127
 			)
 		};
+
+		public void WriteStats(Dictionary<Type, SearchStatistics> statistics, Type referenceSearchType, double total)
+		{
+			double referenceTime = statistics[referenceSearchType].TotalMilliseconds;
+			const string stringRef = @" [Ref]";
+			int maxName = statistics.Keys.Select(t => t.FullName!.Length).Max();
+
+			List<string[]> statColumns = new List<string[]>();
+
+			//statColumns.Clear();
+
+			//Write test report, ordered by Total time (Initialization + Search)
+			foreach (Type type in statistics.Keys.OrderBy(t => statistics[t].InitTime + statistics[t].SearchTime))
+			{
+				SearchStatistics stats = statistics[type];
+
+				List<string> statColumn = new List<string>();
+
+				if (type.Equals(referenceSearchType))
+				{ statColumn.Add(string.Concat(type.FullName!, stringRef).PadRight(maxName + stringRef.Length)); }
+				else
+				{ statColumn.Add(type.FullName!.PadRight(maxName + stringRef.Length)); }
+
+				statColumn.Add($"{stats.InitMilliseconds:##0.000}");
+				statColumn.Add($"{stats.InitMilliseconds * 100.0 / total:##0.00}");
+				statColumn.Add($"{stats.SearchMilliseconds:##0.000}");
+				statColumn.Add($"{stats.SearchMilliseconds * 100.0 / total:##0.00}");
+				statColumn.Add($"{stats.TotalMilliseconds:##0.000}");
+				statColumn.Add($"{stats.TotalMilliseconds * 100.0 / total:##0.00}");
+				statColumn.Add($"{stats.TotalMilliseconds * 100.0 / referenceTime:##0.00}");
+
+				statColumns.Add(statColumn.ToArray());
+			}
+
+			//Calculate maximum display column length
+			int[] maxColumnLengths = Enumerable.Repeat<int>(0, statColumns.Count).ToArray();
+			for (int i = 0; i < statColumns.Count; i++)
+			{
+				for (int j = 0; j < statColumns[i].Length; ++j)
+				{
+					maxColumnLengths[j] = Math.Max(maxColumnLengths[j], statColumns[i][j].Length);
+				}
+			}
+
+			//Pad values to the left to the max length of that value column
+			for (int i = 0; i < statColumns.Count; i++)
+			{
+				for (int j = 0; j < statColumns[i].Length; ++j)
+				{
+					statColumns[i][j] = statColumns[i][j].PadLeft(maxColumnLengths[j]);
+				}
+			}
+
+			//Statistics for each ISearch instance
+			for (int i = 0; i < statColumns.Count; i++)
+			{
+				string[] col = statColumns[i];
+
+				int j = 0;
+				string[] statStrings =
+				{
+						col[j++],
+						$"Init {col[j++]} ms ({col[j++]}%)",
+						$"Search {col[j++]} ms ({col[j++]}%)",
+						$"Total {col[j++]} ms ({col[j++]}%)",
+						$"Ref.% {col[j++]}"
+					};
+
+				Trace.WriteLine
+				(
+					string.Join
+					(
+						string.Concat(" ", stringLightVerticalLine, " "),
+						statStrings.Select(v => string.Concat(v, "")).ToArray()
+					)
+				);
+			}
+		}
 
 		[TestMethod]
 		[Timeout(86400 * 365)]    //Test timeout is one year
@@ -304,11 +360,30 @@ namespace SearchTest
 						//Trace.WriteLine($"{type.FullName}: Init={initWatch.Elapsed.Ticks}, Search={searchWatch.Elapsed.Ticks}");
 					} //END: foreach (Type type in searchTypes)
 				} //END: for (int testSubIteration = 1; testSubIteration <= test.MaxIterations; ++testSubIteration)
+
+
+				Dictionary<Type, SearchStatistics> detailedStatisticsMap = new Dictionary<Type, SearchStatistics>();
+				foreach (Type type in searchTypes)
+				{
+					if(!detailedStatisticsMap.ContainsKey(type))
+					{
+						detailedStatisticsMap.Add(type, new SearchStatistics());
+					}
+					detailedStatisticsMap[type].InitTime += detailedStatistics[type][testIteration].InitTime;
+					detailedStatisticsMap[type].SearchTime += detailedStatistics[type][testIteration].SearchTime;
+				}
+				IEnumerable<StatTimes> subList = detailedStatisticsMap.Values.Select(value => new StatTimes(value.InitTime, value.SearchTime, value.InitTime + value.SearchTime));
+				StatTimes subTotals = subList.Aggregate((a, b) => new StatTimes(a.InitTime + b.InitTime, a.SearchTime + b.SearchTime, a.TotalTime + b.TotalTime));
+
+				double subInit = TimeSpan.FromTicks(subTotals.InitTime).TotalMilliseconds;
+				double subSearch = TimeSpan.FromTicks(subTotals.SearchTime).TotalMilliseconds;
+				double subTotal = TimeSpan.FromTicks(subTotals.InitTime + subTotals.SearchTime).TotalMilliseconds;
+				WriteStats(detailedStatisticsMap, referenceSearchType, subTotal);
+
 			} //END: for (int testIteration = 0; testIteration < SearchTests.Count; ++testIteration)
 
-			Trace.WriteLine(lightDivider);
-
-			int maxName = statistics.Keys.Select(t => t.FullName!.Length).Max();
+			Trace.WriteLine(heavyDivider);
+			//Trace.WriteLine(lightDivider);
 
 			IEnumerable<StatTimes> totalsList = statistics.Values.Select(value => new StatTimes(value.InitTime, value.SearchTime, value.InitTime + value.SearchTime));
 			StatTimes grandTotals = totalsList.Aggregate((a, b) => new StatTimes(a.InitTime + b.InitTime, a.SearchTime + b.SearchTime, a.TotalTime + b.TotalTime));
@@ -317,79 +392,9 @@ namespace SearchTest
 			double grandSearch = TimeSpan.FromTicks(grandTotals.SearchTime).TotalMilliseconds;
 			double grandTotal = TimeSpan.FromTicks(grandTotals.InitTime + grandTotals.SearchTime).TotalMilliseconds;
 
-			Action<Dictionary<Type, SearchStatistics>, Type, double> WriteStats = (statistics, referenceSearchType, grandTotal) =>
-			{
-				double referenceTime = statistics[referenceSearchType].TotalMilliseconds;
-				const string stringRef = @" [Ref]";
-
-				List<string[]> statColumns = new List<string[]>();
-				statColumns.Clear();
-
-				//Write test report, ordered by Total time (Initialization + Search)
-				foreach (Type type in statistics.Keys.OrderBy(t => statistics[t].InitTime + statistics[t].SearchTime))
-				{
-					SearchStatistics stats = statistics[type];
-
-					List<string> statColumn = new List<string>();
-
-					if (type.Equals(referenceSearchType))
-					{ statColumn.Add(string.Concat(type.FullName!, stringRef).PadRight(maxName + stringRef.Length)); }
-					else
-					{ statColumn.Add(type.FullName!.PadRight(maxName + stringRef.Length)); }
-
-					statColumn.Add($"{stats.InitMilliseconds:##0.000}");
-					statColumn.Add($"{stats.InitMilliseconds * 100.0 / grandTotal:##0.00}");
-					statColumn.Add($"{stats.SearchMilliseconds:##0.000}");
-					statColumn.Add($"{stats.SearchMilliseconds * 100.0 / grandTotal:##0.00}");
-					statColumn.Add($"{stats.TotalMilliseconds:##0.000}");
-					statColumn.Add($"{stats.TotalMilliseconds * 100.0 / grandTotal:##0.00}");
-					statColumn.Add($"{stats.TotalMilliseconds * 100.0 / referenceTime:##0.00}");
-
-					statColumns.Add(statColumn.ToArray());
-				}
-
-				//Calculate maximum display column length
-				int[] maxColumnLengths = Enumerable.Repeat<int>(0, statColumns.Count).ToArray();
-				for (int i = 0; i < statColumns.Count; i++)
-				{
-					for (int j = 0; j < statColumns[i].Length; ++j)
-					{
-						maxColumnLengths[j] = Math.Max(maxColumnLengths[j], statColumns[i][j].Length);
-					}
-				}
-
-				//Pad values to the left to the max length of that value column
-				for (int i = 0; i < statColumns.Count; i++)
-				{
-					for (int j = 0; j < statColumns[i].Length; ++j)
-					{
-						statColumns[i][j] = statColumns[i][j].PadLeft(maxColumnLengths[j]);
-					}
-				}
-
-				//Statistics for each ISearch instance
-				for (int i = 0; i < statColumns.Count; i++)
-				{
-					string[] col = statColumns[i];
-
-					int j = 0;
-					string[] statStrings =
-					{
-						col[j++],
-						$"Init {col[j++]} ms ({col[j++]}%)",
-						$"Search {col[j++]} ms ({col[j++]}%)",
-						$"Total {col[j++]} ms ({col[j++]}%)",
-						$"Ref.% {col[j++]}"
-					};
-
-					string verticalSeparator = string.Concat(" ", stringLightVerticalLine, " ");
-					Trace.WriteLine(string.Join(verticalSeparator, statStrings.Select(v => string.Concat(v, "")).ToArray()));
-				}
-			};  //END: Action<Dictionary<Type, SearchStatistics>, Type, double> WriteStats
-
 			WriteStats(statistics, referenceSearchType, grandTotal);
-
-			Trace.WriteLine(lightDivider);
+			Trace.WriteLine(heavyDivider);
+			//Trace.WriteLine(lightDivider);
 
 			//Display cumulative timings
 			string grand = string.Join(System.Environment.NewLine, new string[]

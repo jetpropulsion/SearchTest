@@ -44,6 +44,8 @@
 			this.MaxBufferSize = maxBufferSize;
 			this.MinDistance = minDistance;
 			this.MaxDistance = maxDistance;
+			this.Pattern = null;
+			this.Buffer = null;
 			this.OffsetGenerator = offsetGenerator ?? this.OffsetGenerator;
 			this.PatternGenerator = patternGenerator ?? this.PatternGenerator;
 			this.BufferGenerator = bufferGenerator ?? this.BufferGenerator;
