@@ -13,6 +13,7 @@ namespace SearchTest
 	using System.Collections.Generic;
 	using System.Diagnostics;
 	using System.Reflection;
+	using System.Runtime.InteropServices;
 	using System.Text;
 	using System.Xml.Linq;
 
@@ -69,8 +70,6 @@ namespace SearchTest
 		};
 
 
-		public record StatTimes(long InitTime, long SearchTime, long TotalTime);
-
 		//Method will terminate execution if offset collections are different
 		public static bool EqualOffsets(string firstName, ICollection<int> first, string secondName, ICollection<int> second)
 		{
@@ -100,7 +99,7 @@ namespace SearchTest
 			new SearchTestParams
 			(
 				name: "BackgroundIsPatternMinus1",
-				maxTestIterations: 5,
+				maxTestIterations: 1,
 				minPatternSize: 3,
 				maxPatternSize: 273,
 				minBufferSize: 1048576 * 16,
@@ -112,7 +111,7 @@ namespace SearchTest
 			new SearchTestParams
 			(
 				name: "StandardDistanceAndPattern",
-				maxTestIterations: 5,
+				maxTestIterations: 1,
 				minPatternSize: 3,
 				maxPatternSize: 273,
 				minBufferSize: 1048576 * 16,
@@ -123,7 +122,7 @@ namespace SearchTest
 			new SearchTestParams
 			(
 				name: "SmallDistanceSmallPattern",
-				maxTestIterations: 5,
+				maxTestIterations: 1,
 				minPatternSize: 3,
 				maxPatternSize: 10,
 				minBufferSize: 1048576 * 16,
@@ -211,6 +210,8 @@ namespace SearchTest
 			}
 		}
 
+		public record StatTimes(long InitTime, long SearchTime, long TotalTime);
+
 		[TestMethod]
 		[Timeout(86400 * 365)]    //Test timeout is one year
 		public void Test_All_ISearch_Derivates()
@@ -221,8 +222,6 @@ namespace SearchTest
 			ArgumentNullException.ThrowIfNull(assembly, nameof(assembly));
 
 			Trace.WriteLine(heavyDivider);
-			Trace.WriteLine(lightDivider);
-
 
 			//Reference search algorithm is now BruteForce, choosen over its simplicity (and slowness)
 			ISearch referenceSearch = new Search.Algorithms.BruteForce();
@@ -280,6 +279,7 @@ namespace SearchTest
 
 				for (int testSubIteration = 1; testSubIteration <= test.MaxIterations; ++testSubIteration)
 				{
+					//Call to Reset() will cause Pattern and Buffer members of SearchTestParams class to be re-created
 					test.Reset();
 
 					ReadOnlyMemory<byte> testPattern = test.Pattern;
@@ -294,9 +294,9 @@ namespace SearchTest
 					Trace.WriteLine
 					(
 						$"{test.Name.PadRight(30)}#{testSubIteration}/{test.MaxIterations,-3}:"
-						+ $" {nameof(patternSize)}={patternSize,16}"
-						+ $", {nameof(bufferSize)}={bufferSize,16}"
-						+ $", {nameof(referenceOffsets)}={referenceOffsets.Count,16}"
+						+ $" {nameof(patternSize)}={patternSize,10}"
+						+ $", {nameof(bufferSize)}={bufferSize,10}"
+						+ $", {nameof(referenceOffsets)}={referenceOffsets.Count,10}"
 						+ $" @ {DateTime.Now.ToString(@"yyyy-MM-dd HH:mm:ss.ffffzzz")}"
 					);
 
@@ -359,7 +359,10 @@ namespace SearchTest
 						}
 						//Trace.WriteLine($"{type.FullName}: Init={initWatch.Elapsed.Ticks}, Search={searchWatch.Elapsed.Ticks}");
 					} //END: foreach (Type type in searchTypes)
+
 				} //END: for (int testSubIteration = 1; testSubIteration <= test.MaxIterations; ++testSubIteration)
+
+				Trace.WriteLine("####" + lightDivider);
 
 
 				Dictionary<Type, SearchStatistics> detailedStatisticsMap = new Dictionary<Type, SearchStatistics>();
@@ -372,8 +375,8 @@ namespace SearchTest
 					detailedStatisticsMap[type].InitTime += detailedStatistics[type][testIteration].InitTime;
 					detailedStatisticsMap[type].SearchTime += detailedStatistics[type][testIteration].SearchTime;
 				}
-				IEnumerable<StatTimes> subList = detailedStatisticsMap.Values.Select(value => new StatTimes(value.InitTime, value.SearchTime, value.InitTime + value.SearchTime));
-				StatTimes subTotals = subList.Aggregate((a, b) => new StatTimes(a.InitTime + b.InitTime, a.SearchTime + b.SearchTime, a.TotalTime + b.TotalTime));
+				IEnumerable<StatTimes> subTotalsList = detailedStatisticsMap.Values.Select(value => new StatTimes(value.InitTime, value.SearchTime, value.InitTime + value.SearchTime));
+				StatTimes subTotals = subTotalsList.Aggregate((a, b) => new StatTimes(a.InitTime + b.InitTime, a.SearchTime + b.SearchTime, a.TotalTime + b.TotalTime));
 
 				double subInit = TimeSpan.FromTicks(subTotals.InitTime).TotalMilliseconds;
 				double subSearch = TimeSpan.FromTicks(subTotals.SearchTime).TotalMilliseconds;
@@ -385,25 +388,41 @@ namespace SearchTest
 			Trace.WriteLine(heavyDivider);
 			//Trace.WriteLine(lightDivider);
 
-			IEnumerable<StatTimes> totalsList = statistics.Values.Select(value => new StatTimes(value.InitTime, value.SearchTime, value.InitTime + value.SearchTime));
-			StatTimes grandTotals = totalsList.Aggregate((a, b) => new StatTimes(a.InitTime + b.InitTime, a.SearchTime + b.SearchTime, a.TotalTime + b.TotalTime));
+			Dictionary<Type, SearchStatistics> detailedMap = new Dictionary<Type, SearchStatistics>();
+			foreach (Type type in searchTypes)
+			{
+				IReadOnlyCollection<SearchStatistics> stats = detailedStatistics[type];
+				for(int i = 0; i < stats.Count; ++i)
+				{
+					long initTime = detailedStatistics[type][i].InitTime;
+					long searchTime = detailedStatistics[type][i].SearchTime;
+					if(!detailedMap.ContainsKey(type))
+					{
+						detailedMap[type] = new SearchStatistics();
+					}
+					detailedMap[type].IncrementInitializationTime(initTime);
+					detailedMap[type].IncrementSearchTime(searchTime);
+				}
+			}
 
-			double grandInit = TimeSpan.FromTicks(grandTotals.InitTime).TotalMilliseconds;
-			double grandSearch = TimeSpan.FromTicks(grandTotals.SearchTime).TotalMilliseconds;
-			double grandTotal = TimeSpan.FromTicks(grandTotals.InitTime + grandTotals.SearchTime).TotalMilliseconds;
+			IEnumerable<StatTimes> detailedMapTotalsList = detailedMap.Values.Select(value => new StatTimes(value.InitTime, value.SearchTime, value.InitTime + value.SearchTime));
+			StatTimes detailedMapTotals = detailedMapTotalsList.Aggregate((a, b) => new StatTimes(a.InitTime + b.InitTime, a.SearchTime + b.SearchTime, a.TotalTime + b.TotalTime));
 
-			WriteStats(statistics, referenceSearchType, grandTotal);
-			Trace.WriteLine(heavyDivider);
-			//Trace.WriteLine(lightDivider);
+			double detailedMapInit = TimeSpan.FromTicks(detailedMapTotals.InitTime).TotalMilliseconds;
+			double detailedMapSearch = TimeSpan.FromTicks(detailedMapTotals.SearchTime).TotalMilliseconds;
+			double detailedMapTotal = TimeSpan.FromTicks(detailedMapTotals.InitTime + detailedMapTotals.SearchTime).TotalMilliseconds;
+
+			WriteStats(detailedMap, referenceSearchType, detailedMapTotal);
+			Trace.WriteLine(lightDivider);
 
 			//Display cumulative timings
-			string grand = string.Join(System.Environment.NewLine, new string[]
+			string detailed = string.Join(System.Environment.NewLine, new string[]
 			{
-				$"Grand Init   {grandInit,16:###,###,##0.000} ms",
-				$"Grand Search {grandSearch,16:###,###,##0.000} ms",
-				$"Grand Total  {grandTotal,16:###,###,##0.000} ms"
+				$"Detailed Init   {detailedMapInit,16:###,###,##0.000} ms",
+				$"Detailed Search {detailedMapSearch,16:###,###,##0.000} ms",
+				$"Detailed Total  {detailedMapTotal,16:###,###,##0.000} ms"
 			});
-			Trace.WriteLine(grand);
+			Trace.WriteLine(detailed);
 
 			Trace.WriteLine(heavyDivider);
 		}

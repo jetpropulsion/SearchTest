@@ -65,7 +65,7 @@
 			this.PatternGenerator(this.MinPatternSize, this.MaxPatternSize, out this.PatternSize, out this.Pattern);
 			this.BufferGenerator(this.MinBufferSize, this.MaxBufferSize, this.PatternSize, out this.BufferSize, out this.Buffer);
 			this.BufferFill(ref this.Buffer, this.BufferSize);
-			this.Pattern.CopyTo(this.Buffer, this.BufferSize);
+			this.Pattern.CopyTo(this.Buffer, this.BufferSize);	//Copy Pattern to the end of the Buffer
 			int[] offsets;
 			this.OffsetGenerator(this.BufferSize, this.PatternSize, this.MinDistance, this.MaxDistance, out offsets);
 			this.BufferPatternFill(ref this.Buffer, this.BufferSize, this.Pattern, offsets);
