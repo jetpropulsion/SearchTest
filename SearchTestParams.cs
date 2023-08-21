@@ -205,7 +205,7 @@
 			}
 		}
 
-		public static void RandomPatternByteBufferPatternFill(ref byte[] buffer, int bufferSize, in byte[] pattern, in IReadOnlyList<int> offsets)
+		public static void RandomPatternSegmentBufferPatternFill(ref byte[] buffer, int bufferSize, in byte[] pattern, in IReadOnlyList<int> offsets)
 		{
 			Assert.IsTrue(offsets.Count > 0);
 			Assert.IsTrue(buffer.Length >= bufferSize);
@@ -216,7 +216,11 @@
 			int offset = 0;
 			while (offset <= lastOffset)
 			{
-				buffer[offset++] = pattern[Random.Shared.Next(0, patternSize)];
+				int start = Random.Shared.Next(0, patternSize / 2);
+				int end = Random.Shared.Next(start + 1, patternSize);
+				Span<byte> target = buffer[(offset + start)..(offset + end)];
+				target = pattern[start..end];
+				offset += 1 + end - start;
 			}
 
 			for (int i = 0; i < offsets.Count; i++)
