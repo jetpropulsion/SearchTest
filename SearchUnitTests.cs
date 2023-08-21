@@ -26,8 +26,9 @@ namespace SearchTest
 		*******************************************************************************************************************
 		***
 		*** https://docs.microsoft.com/en-us/visualstudio/test/mstest-update-to-mstestv2?view=vs-2022
-		*** Remove the assembly reference to Microsoft.VisualStudio.QualityTools.UnitTestFramework from your unit test project.
-		*** Add NuGet package references to MSTestV2 including the MSTest.TestFramework and the MSTest.TestAdapter packages on nuget.org. You can install packages in the NuGet Package Manager Console with the following commands:
+		*** Remove the assembly firstOnly to Microsoft.VisualStudio.QualityTools.UnitTestFramework from your unit test project.
+		*** Add NuGet package references to MSTestV2 including the MSTest.TestFramework and the MSTest.TestAdapter packages on nuget.org. 
+		*** You can install packages in the NuGet Package Manager Console with the following commands:
 		*** Console
 		*** Copy
 		*** PM> Install-Package MSTest.TestAdapter -Version 2.1.2
@@ -48,91 +49,128 @@ namespace SearchTest
 		public static readonly string stringLightVerticalLine = charLightVerticalLine.ToString();
 		public static readonly string stringHeavyVerticalLine = charHeavyVerticalLine.ToString();
 
-
-		public class SearchStatistics
-		{
-			public readonly List<int> Offsets;
-			public long InitTime;
-			public long SearchTime;
-
-			public SearchStatistics()
-			{
-				this.Offsets = new List<int>();
-				this.InitTime = 0;
-				this.SearchTime = 0;
-			}
-			public long IncrementInitializationTime(long value) => System.Threading.Interlocked.Add(ref this.InitTime, value);
-			public long IncrementSearchTime(long value) => System.Threading.Interlocked.Add(ref this.SearchTime, value);
-
-			public double InitMilliseconds => TimeSpan.FromTicks(this.InitTime).TotalMilliseconds;
-			public double SearchMilliseconds => TimeSpan.FromTicks(this.SearchTime).TotalMilliseconds;
-			public double TotalMilliseconds => TimeSpan.FromTicks(this.InitTime + this.SearchTime).TotalMilliseconds;
-		};
-
-
-		//Method will terminate execution if offset collections are different
-		public static bool EqualOffsets(string firstName, ICollection<int> first, string secondName, ICollection<int> second)
-		{
-			if (first.Count == second.Count && first.SequenceEqual(second))
-			{
-				return true;
-			}
-
-			IEnumerable<int> intersect = first.Intersect(second);
-			IEnumerable<int> reference = first.Except(intersect);
-			IEnumerable<int> current = second.Except(intersect);
-
-			for (int i = 0; i < reference.Count(); ++i)
-			{
-				Trace.WriteLine($"{firstName} only at position {i}: {reference.ElementAt(i)}");
-			}
-			for (int i = 0; i < current.Count(); ++i)
-			{
-				Trace.WriteLine($"{secondName} only at position {i}: {current.ElementAt(i)}");
-			}
-			return false;
-		}
-
+		const int DefaultMaxIterations = 1;
+		const int DefaultMinSmallPattern = 3;
+		const int DefaultMaxSmallPattern = 16;
+		const int DefaultMinPattern = 3;
+		const int DefaultMaxPattern = 273;
+		const int DefaultMinLargePattern = 1024;
+		const int DefaultMaxLargePattern = 4096;
+		const int DefaultMinBuffer = 1048576;
+		const int DefaultMaxBuffer = 1048576 * 4;
+		const int DefaultMinLargeBuffer = 1048576 * 16;
+		const int DefaultMaxLargeBuffer = 1048576 * 16 * 24;
+		const int DefaultMinLargeDistance = 65536;
+		const int DefaultMaxLargeDistance = 65536 * 2;
 
 		public List<SearchTestParams> SearchTests = new List<SearchTestParams>()
 		{
 			new SearchTestParams
 			(
-				name: "BackgroundIsPatternMinus1",
-				maxTestIterations: 1,
-				minPatternSize: 3,
-				maxPatternSize: 273,
-				minBufferSize: 1048576 * 16,
-				maxBufferSize: 1048576 * 16 * 24,
+				name: "Standard Distance, Standard Pattern, Standard Buffer",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: DefaultMinPattern,
+				maxPatternSize: DefaultMaxPattern,
+				minBufferSize: DefaultMinBuffer,
+				maxBufferSize: DefaultMaxBuffer,
+				minDistance: 32,
+				maxDistance: 1024
+			),
+			new SearchTestParams
+			(
+				name: "Standard Distance, Standard Pattern, Buffer is Pattern minus 1 end byte",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: DefaultMinPattern,
+				maxPatternSize: DefaultMaxPattern,
+				minBufferSize: DefaultMinBuffer,
+				maxBufferSize: DefaultMaxBuffer,
 				minDistance: 1,
 				maxDistance: 273,
 				bufferPatternFill: SearchTestParams.PatternMinusOneBufferPatternFill
 			),
 			new SearchTestParams
 			(
-				name: "StandardDistanceAndPattern",
-				maxTestIterations: 1,
-				minPatternSize: 3,
-				maxPatternSize: 273,
-				minBufferSize: 1048576 * 16,
-				maxBufferSize: 1048576 * 16 * 24,
-				minDistance: 256,
-				maxDistance: 65536
+				name: "Standard Distance, Standard Pattern, Non-Pattern Byte Buffer Fill (use Pattern shorter than 256)",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: DefaultMinSmallPattern,
+				maxPatternSize: DefaultMaxSmallPattern,
+				minBufferSize: DefaultMinBuffer,
+				maxBufferSize: DefaultMaxBuffer,
+				minDistance: 32,
+				maxDistance: 1024,
+				bufferPatternFill: SearchTestParams.NonPatternByteBufferPatternFill
 			),
 			new SearchTestParams
 			(
-				name: "SmallDistanceSmallPattern",
-				maxTestIterations: 1,
-				minPatternSize: 3,
-				maxPatternSize: 10,
-				minBufferSize: 1048576 * 16,
-				maxBufferSize: 1048576 * 16 * 24,
-				minDistance: 2,
-				maxDistance: 127
+				name: "Small Distance, Small Pattern, Standard Buffer",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: DefaultMinSmallPattern,
+				maxPatternSize: DefaultMaxSmallPattern,
+				minBufferSize: DefaultMinBuffer,
+				maxBufferSize: DefaultMaxBuffer,
+				minDistance: 0,
+				maxDistance: 32
+			),
+			new SearchTestParams
+			(
+				name: "Large Distance, Small Pattern, Large Buffer",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: DefaultMinSmallPattern,
+				maxPatternSize: DefaultMaxSmallPattern,
+				minBufferSize: DefaultMinLargeBuffer,
+				maxBufferSize: DefaultMaxLargeBuffer,
+				minDistance: DefaultMinLargeDistance,
+				maxDistance: DefaultMaxLargeDistance
+			),
+			new SearchTestParams
+			(
+				name: "Large Distance, Small Pattern, Large Buffer, Random Pattern Byte Fill",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: DefaultMinSmallPattern,
+				maxPatternSize: DefaultMaxSmallPattern,
+				minBufferSize: DefaultMinLargeBuffer,
+				maxBufferSize: DefaultMaxLargeBuffer,
+				minDistance: DefaultMinLargeDistance,
+				maxDistance: DefaultMaxLargeDistance,
+				bufferPatternFill: SearchTestParams.RandomPatternByteBufferPatternFill
+			),
+			new SearchTestParams
+			(
+				name: "Large Distance, Large Pattern, Random Pattern Byte Fill",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: DefaultMinLargePattern,
+				maxPatternSize: DefaultMaxLargePattern,
+				minBufferSize: DefaultMinLargeBuffer,
+				maxBufferSize: DefaultMaxLargeBuffer,
+				minDistance: DefaultMinLargeDistance,
+				maxDistance: DefaultMaxLargeDistance,
+				bufferPatternFill: SearchTestParams.RandomPatternByteBufferPatternFill
+			),
+			new SearchTestParams
+			(
+				name: "Large Distance, Large Pattern, Large Buffer",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: DefaultMinLargePattern,
+				maxPatternSize: DefaultMaxLargePattern,
+				minBufferSize: DefaultMinLargeBuffer,
+				maxBufferSize: DefaultMaxLargeBuffer,
+				minDistance: DefaultMinLargeDistance,
+				maxDistance: DefaultMaxLargeDistance
+			),
+			new SearchTestParams
+			(
+				name: "Large Distance, Large Pattern, Large Buffer, Random Pattern Byte Fill",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: DefaultMinLargePattern,
+				maxPatternSize: DefaultMaxLargePattern,
+				minBufferSize: DefaultMinLargeBuffer,
+				maxBufferSize: DefaultMaxLargeBuffer,
+				minDistance: DefaultMinLargeDistance,
+				maxDistance: DefaultMaxLargeDistance
 			)
 		};
 
-		public void WriteStats(Dictionary<Type, SearchStatistics> statistics, Type referenceSearchType, double total)
+		public void WriteStats(IReadOnlyDictionary<Type, SearchStatistics> statistics, Type referenceSearchType, SearchStatistics total)
 		{
 			double referenceTime = statistics[referenceSearchType].TotalMilliseconds;
 			const string stringRef = @" [Ref]";
@@ -150,23 +188,27 @@ namespace SearchTest
 				List<string> statColumn = new List<string>();
 
 				if (type.Equals(referenceSearchType))
-				{ statColumn.Add(string.Concat(type.FullName!, stringRef).PadRight(maxName + stringRef.Length)); }
+				{
+					statColumn.Add(string.Concat(type.FullName!, stringRef).PadRight(maxName + stringRef.Length));
+				}
 				else
-				{ statColumn.Add(type.FullName!.PadRight(maxName + stringRef.Length)); }
+				{
+					statColumn.Add(type.FullName!.PadRight(maxName + stringRef.Length));
+				}
 
 				statColumn.Add($"{stats.InitMilliseconds:##0.000}");
-				statColumn.Add($"{stats.InitMilliseconds * 100.0 / total:##0.00}");
+				statColumn.Add($"{stats.InitMilliseconds * 100.0 / total.TotalMilliseconds:##0.00}");
 				statColumn.Add($"{stats.SearchMilliseconds:##0.000}");
-				statColumn.Add($"{stats.SearchMilliseconds * 100.0 / total:##0.00}");
+				statColumn.Add($"{stats.SearchMilliseconds * 100.0 / total.TotalMilliseconds:##0.00}");
 				statColumn.Add($"{stats.TotalMilliseconds:##0.000}");
-				statColumn.Add($"{stats.TotalMilliseconds * 100.0 / total:##0.00}");
+				statColumn.Add($"{stats.TotalMilliseconds * 100.0 / total.TotalMilliseconds:##0.00}");
 				statColumn.Add($"{stats.TotalMilliseconds * 100.0 / referenceTime:##0.00}");
 
 				statColumns.Add(statColumn.ToArray());
 			}
 
 			//Calculate maximum display column length
-			int[] maxColumnLengths = Enumerable.Repeat<int>(0, statColumns.Count).ToArray();
+			int[] maxColumnLengths = Enumerable.Repeat<int>(0, statColumns[0].Length).ToArray();
 			for (int i = 0; i < statColumns.Count; i++)
 			{
 				for (int j = 0; j < statColumns[i].Length; ++j)
@@ -187,16 +229,16 @@ namespace SearchTest
 			//Statistics for each ISearch instance
 			for (int i = 0; i < statColumns.Count; i++)
 			{
-				string[] col = statColumns[i];
+				string[] c = statColumns[i];
 
 				int j = 0;
 				string[] statStrings =
 				{
-						col[j++],
-						$"Init {col[j++]} ms ({col[j++]}%)",
-						$"Search {col[j++]} ms ({col[j++]}%)",
-						$"Total {col[j++]} ms ({col[j++]}%)",
-						$"Ref.% {col[j++]}"
+						c[j++],
+						$"Init {c[j++]} ms ({c[j++]}%)",
+						$"Search {c[j++]} ms ({c[j++]}%)",
+						$"Total {c[j++]} ms ({c[j++]}%)",
+						$"Ref.% {c[j++]}"
 					};
 
 				Trace.WriteLine
@@ -204,17 +246,70 @@ namespace SearchTest
 					string.Join
 					(
 						string.Concat(" ", stringLightVerticalLine, " "),
-						statStrings.Select(v => string.Concat(v, "")).ToArray()
+						statStrings
+							.Select(v => string.Concat(v, ""))
+							.ToArray()
 					)
 				);
 			}
 		}
 
-		public record StatTimes(long InitTime, long SearchTime, long TotalTime);
+		public void AggregateStatistics(IReadOnlyCollection<Type> searchTypes, IReadOnlyDictionary<Type, SearchStatistics[]> statistics, int testStart, int testCount, out Dictionary<Type, SearchStatistics> aggregatedTypes, out SearchStatistics aggregated)
+		{
+			//Dictionary<Type, SearchStatistics>
+			aggregatedTypes = new Dictionary<Type, SearchStatistics>();
+			foreach (Type type in searchTypes)
+			{
+				IReadOnlyCollection<SearchStatistics> statistic = statistics[type];
+				for (int i = testStart; i < testStart + testCount; ++i)
+				{
+					long initTime = statistics[type][i].InitTime;
+					long searchTime = statistics[type][i].SearchTime;
+					if (!aggregatedTypes.ContainsKey(type))
+					{
+						aggregatedTypes[type] = new SearchStatistics(initTime, searchTime);
+					}
+					else
+					{
+						aggregatedTypes[type].IncrementInitializationTime(initTime);
+						aggregatedTypes[type].IncrementSearchTime(searchTime);
+					}
+				}
+			}
+
+			aggregated = aggregatedTypes.Values.Aggregate((a, b) => new SearchStatistics(a.InitTime + b.InitTime, a.SearchTime + b.SearchTime));
+		}
+
+		//Method will terminate execution if offset collections are different
+		public static bool EqualOffsets(string firstName, IReadOnlyCollection<int> first, string secondName, IReadOnlyCollection<int> second)
+		{
+			if (first.Count == second.Count && first.SequenceEqual(second))
+			{
+				return true;
+			}
+
+			IEnumerable<int> intersect = first.Intersect(second);
+			IEnumerable<int> firstOnly = first.Except(intersect);
+			IEnumerable<int> secondOnly = second.Except(intersect);
+
+			Trace.WriteLine($"{firstName} count: {firstOnly.Count()}");
+			Trace.WriteLine($"{secondName} count: {secondOnly.Count()}");
+			//for (int i = 0; i < firstOnly.Count(); ++i)
+			//{
+			//	Trace.WriteLine($"{firstName} only at position {i}: {firstOnly.ElementAt(i)}");
+			//}
+			//for (int i = 0; i < secondOnly.Count(); ++i)
+			//{
+			//	Trace.WriteLine($"{secondName} only at position {i}: {secondOnly.ElementAt(i)}");
+			//}
+			return false;
+		}
+
 
 		[TestMethod]
 		[Timeout(86400 * 365)]    //Test timeout is one year
-		public void Test_All_ISearch_Derivates()
+		
+		public void TestAllDerivates()
 		{
 			Trace.AutoFlush = true;
 
@@ -228,8 +323,7 @@ namespace SearchTest
 			Type referenceSearchType = referenceSearch.GetType();
 
 			//Dictionary of Type (which must inherit from ISearch) and its measured searcj statistics
-			Dictionary<Type, SearchStatistics> statistics = new();
-			Dictionary<Type, SearchStatistics[]> detailedStatistics = new();
+			Dictionary<Type, SearchStatistics[]> statistics = new();
 
 			//Blacklists
 			HashSet<Type> blacklistedTypes = new HashSet<Type>()
@@ -258,14 +352,10 @@ namespace SearchTest
 				//If statistics context doesn't contain SearchStatistics object, this is the first occurence, add new one
 				if (!statistics.ContainsKey(type))
 				{
-					statistics.Add(type, new SearchStatistics());
-				}
-				if (!detailedStatistics.ContainsKey(type))
-				{
-					detailedStatistics.Add(type, new SearchStatistics[SearchTests.Count]);
-					for(int i = 0; i < detailedStatistics[type].Length; ++i)
+					statistics.Add(type, new SearchStatistics[SearchTests.Count]);
+					for (int i = 0; i < statistics[type].Length; ++i)
 					{
-						detailedStatistics[type][i] = new SearchStatistics();
+						statistics[type][i] = new SearchStatistics();
 					}
 				}
 			}
@@ -277,43 +367,64 @@ namespace SearchTest
 				SearchTestParams test = SearchTests[testIteration];
 				string testName = test.Name;
 
-				for (int testSubIteration = 1; testSubIteration <= test.MaxIterations; ++testSubIteration)
+				string[] testInfo = new string[]
 				{
-					//Call to Reset() will cause Pattern and Buffer members of SearchTestParams class to be re-created
+						$"{nameof(test.MinPatternSize)}={test.MinPatternSize}"
+						, $"{nameof(test.MaxPatternSize)}={test.MaxPatternSize}"
+						, $"{nameof(test.MinBufferSize)}={test.MinBufferSize}"
+						, $"{nameof(test.MaxBufferSize)}={test.MaxBufferSize}"
+						, $"{nameof(test.MinDistance)}={test.MinDistance}"
+						, $"{nameof(test.MaxDistance)}={test.MaxDistance}"
+						, $"{nameof(test.MaxIterations)}={test.MaxIterations}"
+				};
+				Trace.WriteLine(string.Concat($"### {testName} ###", System.Environment.NewLine, string.Join(@", ", testInfo)));
+
+				for (int testSubIteration = 0; testSubIteration < test.MaxIterations; ++testSubIteration)
+				{
+					//Call to Reset() will cause PatternLocation and Buffer members of SearchTestParams class to be re-created
 					test.Reset();
 
 					ReadOnlyMemory<byte> testPattern = test.Pattern;
 					ReadOnlyMemory<byte> testBuffer = test.Buffer;
-					int patternSize = test.PatternSize;
-					int bufferSize = test.BufferSize;
+					int patternSize = testPattern.Length;
+					int bufferSize = testBuffer.Length;
 
 					List<int> referenceOffsets = new List<int>();
-					referenceSearch.Init(testPattern, (int offset, Type caller) => { referenceOffsets.Add(offset); return true; });
-					referenceSearch.Search(testBuffer, 0, bufferSize);
-
-					Trace.WriteLine
+					referenceSearch.Init
 					(
-						$"{test.Name.PadRight(30)}#{testSubIteration}/{test.MaxIterations,-3}:"
-						+ $" {nameof(patternSize)}={patternSize,10}"
-						+ $", {nameof(bufferSize)}={bufferSize,10}"
-						+ $", {nameof(referenceOffsets)}={referenceOffsets.Count,10}"
-						+ $" @ {DateTime.Now.ToString(@"yyyy-MM-dd HH:mm:ss.ffffzzz")}"
+						testPattern,
+						(int offset, Type caller) =>
+						{
+							referenceOffsets.Add(offset);
+							return true;
+						}
 					);
+					referenceSearch.Search(testBuffer, 0, bufferSize);
+					Assert.IsTrue(referenceOffsets.Count > 0);
 
-					/*
-					//Compare generated vs. reference search gathered offsets
-					//NOTE: this check should be skipped, if overlapping test strings or randomly generated sequences are used
-					if(!EqualOffsets("generated", generatedOffsets, "reference", referenceOffsets))
+					string[] testIterationInfo = new string[]
 					{
-						Assert.Fail($"{nameof(generatedOffsets)} (Count={generatedOffsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
-					}
-					*/
+						$"{test.Name} #{(testSubIteration + 1)}/{test.MaxIterations}"
+						, $"Time={DateTime.Now.ToString(@"yyyy-MM-dd HH:mm:ss.ffffzzz")}"
+						, $"{nameof(referenceOffsets)}={referenceOffsets.Count}"
+						, $"{nameof(test.PatternSize)}={test.PatternSize}"
+						, $"{nameof(test.BufferSize)}={test.BufferSize}"
+					};
+					Trace.WriteLine(string.Join(@", ", testIterationInfo));
+
+					//Compare generated vs. firstOnly search gathered offsets
+					//NOTE: this check should be skipped, if overlapping test strings or randomly generated sequences are used
+					//if(!EqualOffsets("generated", test.Offsets, "reference", referenceOffsets))
+					//{
+					//	Assert.Fail($"{nameof(test.Offsets)} (Count={test.Offsets.Length}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
+					//}
+
 
 					Stopwatch initWatch = new();
 					Stopwatch searchWatch = new();
 
 					//Clear previous offsets and counters only. Keep accumulated timings.
-					statistics.Keys.ToList().ForEach(k => statistics[k].Offsets.Clear());
+					statistics.Keys.ToList().ForEach(k => statistics[k][testIteration].Offsets.Clear());
 
 					//Automatically instantiate ISearch derivates with Type and custom Attribute filtering
 					foreach (Type type in searchTypes)
@@ -326,101 +437,81 @@ namespace SearchTest
 						initWatch.Restart();
 
 						//Lambda inline function advises search algorithm implementation what is the search pattern and the delegate whic receives the offset when pattern is found.
-						genericSearch.Init(testPattern, (int offset, Type caller) => { statistics[caller].Offsets.Add(offset); return true; });
+						genericSearch.Init
+						(
+							testPattern,
+							(int offset, Type caller) =>
+							{
+								statistics[caller][testIteration].Offsets.Add(offset);
+								return true;
+							}
+						);
 
 						//Stop the timer, and increment initialization time statistics
 						initWatch.Stop();
-						long elapsedInit = initWatch.Elapsed.Ticks;
-						_ = statistics[type].IncrementInitializationTime(elapsedInit);
-						_ = detailedStatistics[type][testIteration].IncrementInitializationTime(elapsedInit);
+						_ = statistics[type][testIteration].IncrementInitializationTime(initWatch.Elapsed.Ticks);
 
 						//Accumulate duration of search for each generic search algorithm
 						searchWatch.Restart();
 						try
 						{
-							genericSearch.Search(testBuffer, 0, bufferSize);
+							if(genericSearch.IsEnlargementNeeded())
+							{
+								int enlargedSize;
+								byte[] enlargedBuffer;
+								genericSearch.GetEnlargedBuffer(testBuffer, testPattern, out enlargedSize, out enlargedBuffer);
+								genericSearch.Search(enlargedBuffer, 0, enlargedSize);
+							}
+							else
+							{
+								genericSearch.Search(testBuffer, 0, bufferSize);
+							}
 						}
 						catch (Exception ex)
 						{
 							Assert.Fail($"[SEARCH EXCEPTION] Type={type}, Details:{ex}", ex);
 						}
 						searchWatch.Stop();
-						long elapsedSearch = searchWatch.Elapsed.Ticks;
-						_ = statistics[type].IncrementSearchTime(elapsedSearch);
-						_ = detailedStatistics[type][testIteration].IncrementSearchTime(elapsedSearch);
+						_ = statistics[type][testIteration].IncrementSearchTime(searchWatch.Elapsed.Ticks);
 
-						//Check if offsets of the found pattern returned by generic algorithm is equal to reference offsets of the pattern
+						//Check if offsets of the found pattern returned by generic algorithm is equal to firstOnly offsets of the pattern
 						if (!type.Equals(referenceSearchType))
 						{
-							if (!EqualOffsets("generic", statistics[type].Offsets, "reference", referenceOffsets))
+							if (!EqualOffsets(type.FullName!, statistics[type][testIteration].Offsets, referenceSearchType.FullName!, referenceOffsets))
 							{
-								Assert.Fail($"generic (Count={statistics[type].Offsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
+								Assert.Fail($"generic (Count={statistics[type][testIteration].Offsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
 							}
 						}
 						//Trace.WriteLine($"{type.FullName}: Init={initWatch.Elapsed.Ticks}, Search={searchWatch.Elapsed.Ticks}");
 					} //END: foreach (Type type in searchTypes)
 
 				} //END: for (int testSubIteration = 1; testSubIteration <= test.MaxIterations; ++testSubIteration)
+				Trace.WriteLine(lightDivider);			//"####"
 
-				Trace.WriteLine("####" + lightDivider);
-
-
-				Dictionary<Type, SearchStatistics> detailedStatisticsMap = new Dictionary<Type, SearchStatistics>();
-				foreach (Type type in searchTypes)
-				{
-					if(!detailedStatisticsMap.ContainsKey(type))
-					{
-						detailedStatisticsMap.Add(type, new SearchStatistics());
-					}
-					detailedStatisticsMap[type].InitTime += detailedStatistics[type][testIteration].InitTime;
-					detailedStatisticsMap[type].SearchTime += detailedStatistics[type][testIteration].SearchTime;
-				}
-				IEnumerable<StatTimes> subTotalsList = detailedStatisticsMap.Values.Select(value => new StatTimes(value.InitTime, value.SearchTime, value.InitTime + value.SearchTime));
-				StatTimes subTotals = subTotalsList.Aggregate((a, b) => new StatTimes(a.InitTime + b.InitTime, a.SearchTime + b.SearchTime, a.TotalTime + b.TotalTime));
-
-				double subInit = TimeSpan.FromTicks(subTotals.InitTime).TotalMilliseconds;
-				double subSearch = TimeSpan.FromTicks(subTotals.SearchTime).TotalMilliseconds;
-				double subTotal = TimeSpan.FromTicks(subTotals.InitTime + subTotals.SearchTime).TotalMilliseconds;
-				WriteStats(detailedStatisticsMap, referenceSearchType, subTotal);
+				Dictionary<Type, SearchStatistics> subTotalTypes;
+				SearchStatistics subTotal;
+				AggregateStatistics(searchTypes, statistics, testIteration, 1, out subTotalTypes, out subTotal);
+				WriteStats(subTotalTypes, referenceSearchType, subTotal);
+				Trace.WriteLine(lightDivider);      //"#@@#"
 
 			} //END: for (int testIteration = 0; testIteration < SearchTests.Count; ++testIteration)
 
 			Trace.WriteLine(heavyDivider);
-			//Trace.WriteLine(lightDivider);
+			Trace.WriteLine(heavyDivider);
 
-			Dictionary<Type, SearchStatistics> detailedMap = new Dictionary<Type, SearchStatistics>();
-			foreach (Type type in searchTypes)
-			{
-				IReadOnlyCollection<SearchStatistics> stats = detailedStatistics[type];
-				for(int i = 0; i < stats.Count; ++i)
-				{
-					long initTime = detailedStatistics[type][i].InitTime;
-					long searchTime = detailedStatistics[type][i].SearchTime;
-					if(!detailedMap.ContainsKey(type))
-					{
-						detailedMap[type] = new SearchStatistics();
-					}
-					detailedMap[type].IncrementInitializationTime(initTime);
-					detailedMap[type].IncrementSearchTime(searchTime);
-				}
-			}
+			Dictionary<Type, SearchStatistics> totalTypes;
+			SearchStatistics totalTotal;
+			AggregateStatistics(searchTypes, statistics, testStart: 0, SearchTests.Count, out totalTypes, out totalTotal);
+			WriteStats(totalTypes, referenceSearchType, totalTotal);
 
-			IEnumerable<StatTimes> detailedMapTotalsList = detailedMap.Values.Select(value => new StatTimes(value.InitTime, value.SearchTime, value.InitTime + value.SearchTime));
-			StatTimes detailedMapTotals = detailedMapTotalsList.Aggregate((a, b) => new StatTimes(a.InitTime + b.InitTime, a.SearchTime + b.SearchTime, a.TotalTime + b.TotalTime));
-
-			double detailedMapInit = TimeSpan.FromTicks(detailedMapTotals.InitTime).TotalMilliseconds;
-			double detailedMapSearch = TimeSpan.FromTicks(detailedMapTotals.SearchTime).TotalMilliseconds;
-			double detailedMapTotal = TimeSpan.FromTicks(detailedMapTotals.InitTime + detailedMapTotals.SearchTime).TotalMilliseconds;
-
-			WriteStats(detailedMap, referenceSearchType, detailedMapTotal);
 			Trace.WriteLine(lightDivider);
 
 			//Display cumulative timings
 			string detailed = string.Join(System.Environment.NewLine, new string[]
 			{
-				$"Detailed Init   {detailedMapInit,16:###,###,##0.000} ms",
-				$"Detailed Search {detailedMapSearch,16:###,###,##0.000} ms",
-				$"Detailed Total  {detailedMapTotal,16:###,###,##0.000} ms"
+				$"Global Init   {totalTotal.InitMilliseconds,16:###,###,##0.000} ms",
+				$"Global Search {totalTotal.SearchMilliseconds,16:###,###,##0.000} ms",
+				$"Global Total  {totalTotal.TotalMilliseconds,16:###,###,##0.000} ms"
 			});
 			Trace.WriteLine(detailed);
 
