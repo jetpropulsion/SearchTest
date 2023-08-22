@@ -49,10 +49,14 @@ namespace SearchTest
 		public static readonly string stringLightVerticalLine = charLightVerticalLine.ToString();
 		public static readonly string stringHeavyVerticalLine = charHeavyVerticalLine.ToString();
 
+#if DEBUG
 		const int DefaultMaxIterations = 1;
+#else
+		const int DefaultMaxIterations = 3;
+#endif
 		const int DefaultMinSmallPattern = 3;
 		const int DefaultMaxSmallPattern = 16;
-		const int DefaultMinPattern = 3;
+		const int DefaultMinPattern = 4;
 		const int DefaultMaxPattern = 273;
 		const int DefaultMinLargePattern = 1024;
 		const int DefaultMaxLargePattern = 4096;
@@ -80,18 +84,18 @@ namespace SearchTest
 				minDistance: DefaultMinDistance,
 				maxDistance: DefaultMaxDistance
 			),
-			new SearchTestParams
-			(
-				name: "Standard Distance, Standard Pattern, Standard Buffer, Buffer is Pattern minus 1 (end byte)",
-				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinPattern,
-				maxPatternSize: DefaultMaxPattern,
-				minBufferSize: DefaultMinBuffer,
-				maxBufferSize: DefaultMaxBuffer,
-				minDistance: DefaultMinDistance,
-				maxDistance: DefaultMaxDistance,
-				bufferPatternFill: SearchTestParams.PatternMinusOneBufferPatternFill
-			),
+			//new SearchTestParams
+			//(
+			//	name: "Standard Distance, Standard Pattern, Standard Buffer, Buffer is Pattern minus 1 (end byte)",
+			//	maxTestIterations: DefaultMaxIterations,
+			//	minPatternSize: DefaultMinPattern,
+			//	maxPatternSize: DefaultMaxPattern,
+			//	minBufferSize: DefaultMinBuffer,
+			//	maxBufferSize: DefaultMaxBuffer,
+			//	minDistance: DefaultMinDistance,
+			//	maxDistance: DefaultMaxDistance,
+			//	bufferPatternFill: SearchTestParams.PatternMinusOneBufferPatternFill
+			//),
 			new SearchTestParams
 			(
 				name: "Standard Distance, Standard Pattern, Standard Buffer, Non-Pattern Byte Buffer Fill (use Pattern shorter than 256)",
@@ -117,6 +121,18 @@ namespace SearchTest
 			),
 			new SearchTestParams
 			(
+				name: "Small Distance, Small Pattern, Standard Buffer, Non Pattern Byte Buffer Pattern Fill (use Pattern shorter than 256)",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: DefaultMinSmallPattern,
+				maxPatternSize: DefaultMaxSmallPattern,
+				minBufferSize: DefaultMinBuffer,
+				maxBufferSize: DefaultMaxBuffer,
+				minDistance: DefaultMinSmallDistance,
+				maxDistance: DefaultMaxSmallDistance,
+				bufferPatternFill: SearchTestParams.NonPatternByteBufferPatternFill
+			),
+			new SearchTestParams
+			(
 				name: "Small Distance, Large Pattern, Large Buffer",
 				maxTestIterations: DefaultMaxIterations,
 				minPatternSize: DefaultMinLargePattern,
@@ -128,18 +144,19 @@ namespace SearchTest
 			),
 			new SearchTestParams
 			(
-				name: "Small Distance, Large Pattern, Large Buffer",
+				name: "Small Distance, Large Pattern, Large Buffer, Random Pattern Segment Fill",
 				maxTestIterations: DefaultMaxIterations,
 				minPatternSize: DefaultMinLargePattern,
 				maxPatternSize: DefaultMaxLargePattern,
 				minBufferSize: DefaultMinLargeBuffer,
 				maxBufferSize: DefaultMaxLargeBuffer,
 				minDistance: DefaultMinSmallDistance,
-				maxDistance: DefaultMaxSmallDistance
+				maxDistance: DefaultMaxSmallDistance,
+				bufferPatternFill: SearchTestParams.RandomPatternSegmentBufferPatternFill
 			),
 			new SearchTestParams
 			(
-				name: "Large Distance, Small Pattern, Large Buffer, Random Pattern Fill",
+				name: "Large Distance, Small Pattern, Large Buffer, Random Pattern Segment Fill",
 				maxTestIterations: DefaultMaxIterations,
 				minPatternSize: DefaultMinSmallPattern,
 				maxPatternSize: DefaultMaxSmallPattern,
@@ -151,7 +168,7 @@ namespace SearchTest
 			),
 			new SearchTestParams
 			(
-				name: "Large Distance, Small Pattern, Large Buffer, Random Pattern Fill",
+				name: "Large Distance, Small Pattern, Large Buffer, Random Pattern Segment Fill",
 				maxTestIterations: DefaultMaxIterations,
 				minPatternSize: DefaultMinSmallPattern,
 				maxPatternSize: DefaultMaxSmallPattern,
@@ -163,7 +180,7 @@ namespace SearchTest
 			),
 			new SearchTestParams
 			(
-				name: "Large Distance, Large Pattern, Large Buffer, Random Pattern Fill",
+				name: "Large Distance, Large Pattern, Large Buffer, Random Pattern Segment Fill",
 				maxTestIterations: DefaultMaxIterations,
 				minPatternSize: DefaultMinLargePattern,
 				maxPatternSize: DefaultMaxLargePattern,
@@ -186,14 +203,15 @@ namespace SearchTest
 			),
 			new SearchTestParams
 			(
-				name: "Large Distance, Large Pattern, Large Buffer, Random Pattern Fill",
+				name: "Large Distance, Large Pattern, Large Buffer, Random Pattern Segment Fill",
 				maxTestIterations: DefaultMaxIterations,
 				minPatternSize: DefaultMinLargePattern,
 				maxPatternSize: DefaultMaxLargePattern,
 				minBufferSize: DefaultMinLargeBuffer,
 				maxBufferSize: DefaultMaxLargeBuffer,
 				minDistance: DefaultMinLargeDistance,
-				maxDistance: DefaultMaxLargeDistance
+				maxDistance: DefaultMaxLargeDistance,
+				bufferPatternFill: SearchTestParams.RandomPatternSegmentBufferPatternFill
 			)
 		};
 
@@ -201,11 +219,9 @@ namespace SearchTest
 		{
 			double referenceTime = statistics[referenceSearchType].TotalMilliseconds;
 			const string stringRef = @" [Ref]";
-			int maxName = statistics.Keys.Select(t => t.FullName!.Length).Max();
+			int maxName = statistics.Keys.Max(t => t.Name!.Length);
 
 			List<string[]> statColumns = new List<string[]>();
-
-			//statColumns.Clear();
 
 			//Write test report, ordered by Total time (Initialization + Search)
 			foreach (Type type in statistics.Keys.OrderBy(t => statistics[t].InitTime + statistics[t].SearchTime))
@@ -216,11 +232,11 @@ namespace SearchTest
 
 				if (type.Equals(referenceSearchType))
 				{
-					statColumn.Add(string.Concat(type.FullName!, stringRef).PadRight(maxName + stringRef.Length));
+					statColumn.Add(string.Concat(type.Name!, stringRef).PadRight(maxName + stringRef.Length));
 				}
 				else
 				{
-					statColumn.Add(type.FullName!.PadRight(maxName + stringRef.Length));
+					statColumn.Add(type.Name!.PadRight(maxName + stringRef.Length));
 				}
 
 				statColumn.Add($"{stats.InitMilliseconds:##0.000}");
@@ -283,7 +299,6 @@ namespace SearchTest
 
 		public void AggregateStatistics(IReadOnlyCollection<Type> searchTypes, IReadOnlyDictionary<Type, SearchStatistics[]> statistics, int testStart, int testCount, out Dictionary<Type, SearchStatistics> aggregatedTypes, out SearchStatistics aggregated)
 		{
-			//Dictionary<Type, SearchStatistics>
 			aggregatedTypes = new Dictionary<Type, SearchStatistics>();
 			foreach (Type type in searchTypes)
 			{
@@ -389,7 +404,7 @@ namespace SearchTest
 				}
 			}
 
-			Type[] searchTypes = statistics.Keys.Select(x => x).OrderBy(x => x.FullName, StringComparer.Ordinal).ToArray();
+			Type[] searchTypes = statistics.Keys.Select(x => x).OrderBy(x => x.Name, StringComparer.Ordinal).ToArray();
 
 			for (int testIteration = 0; testIteration < SearchTests.Count; ++testIteration)
 			{
@@ -434,7 +449,7 @@ namespace SearchTest
 					string[] testIterationInfo = new string[]
 					{
 						$"{DateTime.Now.ToString(@"yyyy-MM-dd HH:mm:ss.ffffzzz")}"
-						, $"{test.Name} #{(testSubIteration + 1)}/{test.MaxIterations}"
+						, $"#{(testSubIteration + 1)}/{test.MaxIterations}"
 						, $"{nameof(test.PatternSize)}={test.PatternSize}"
 						, $"{nameof(test.BufferSize)}={test.BufferSize}"
 						, $"{nameof(referenceOffsets)}={referenceOffsets.Count}"
@@ -443,7 +458,7 @@ namespace SearchTest
 
 					//Compare generated vs. firstOnly search gathered offsets
 					//NOTE: this check should be skipped, if overlapping test strings or randomly generated sequences are used
-					//if(!EqualOffsets("generated", test.Offsets, "reference", referenceOffsets))
+					//if (!EqualOffsets("generated", test.Offsets, "reference", referenceOffsets))
 					//{
 					//	Assert.Fail($"{nameof(test.Offsets)} (Count={test.Offsets.Length}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
 					//}
@@ -458,6 +473,8 @@ namespace SearchTest
 					//Automatically instantiate ISearch derivates with Type and custom Attribute filtering
 					foreach (Type type in searchTypes)
 					{
+						Assert.IsTrue(referenceOffsets.Count > 0);
+
 						//Create instance of generic search algorithm exposing ISearch interface
 						Assembly searchAssembly = type.Assembly;
 						ISearch genericSearch = (ISearch)(searchAssembly.CreateInstance(type.FullName!, false) ?? throw new ApplicationException(type.FullName));
@@ -483,7 +500,10 @@ namespace SearchTest
 						//Accumulate duration of search for each generic search algorithm
 						try
 						{
-							if(genericSearch.IsEnlargementNeeded())
+							//searchWatch.Restart();
+							//genericSearch.Search(testBuffer, 0, bufferSize);
+
+							if (genericSearch.IsEnlargementNeeded())
 							{
 								int enlargedSize;
 								byte[] enlargedBuffer;
@@ -509,10 +529,9 @@ namespace SearchTest
 						{
 							if (!EqualOffsets(type.FullName!, statistics[type][testIteration].Offsets, referenceSearchType.FullName!, referenceOffsets))
 							{
-								Assert.Fail($"generic (Count={statistics[type][testIteration].Offsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
+								Assert.Fail($"{type.FullName} (Count={statistics[type][testIteration].Offsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
 							}
 						}
-						//Trace.WriteLine($"{type.FullName}: Init={initWatch.Elapsed.Ticks}, Search={searchWatch.Elapsed.Ticks}");
 					} //END: foreach (Type type in searchTypes)
 
 				} //END: for (int testSubIteration = 1; testSubIteration <= test.MaxIterations; ++testSubIteration)

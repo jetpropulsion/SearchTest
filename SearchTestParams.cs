@@ -5,6 +5,7 @@
 	using System.Diagnostics;
 	using System.Diagnostics.CodeAnalysis;
 	using System.Linq;
+	using System.Runtime.CompilerServices;
 	using System.Text;
 	using System.Threading.Tasks;
 
@@ -22,6 +23,7 @@
 		public BufferFillDelegate BufferFill = DefaultBufferFill;
 		public BufferPatternFillDelegate BufferPatternFill = DefaultBufferPatternFill;
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public SearchTestParams
 		(
 			string name,
@@ -54,6 +56,7 @@
 			this.BufferPatternFill = bufferPatternFill ?? this.BufferPatternFill;
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public void Reset()
 		{
 			Assert.IsFalse(string.IsNullOrWhiteSpace(this.Name));
@@ -93,6 +96,7 @@
 
 		#region Default Implementations
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public static void DefaultOffsetGenerator(int bufferSize, int patternSize, int minDistance, int maxDistance, out int[] offsets)
 		{
 			int lastOffset = bufferSize - patternSize;
@@ -116,6 +120,7 @@
 			Assert.IsTrue(offsets.Length > 0);
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public static void DefaultPatternGenerator(int minPatternSize, int maxPatternSize, out int patternSize, out byte[] pattern)
 		{
 			patternSize = Random.Shared.Next(minPatternSize, maxPatternSize + 1);
@@ -123,18 +128,28 @@
 			Random.Shared.NextBytes(pattern);
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public static void DefaultBufferGenerator(int minBufferSize, int maxBufferSize, int safetyMargin, out int bufferSize, out byte[] buffer)
 		{
 			bufferSize = Random.Shared.Next(minBufferSize, maxBufferSize + 1);
 			buffer = new byte[bufferSize + safetyMargin];
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public static void DefaultBufferFill(ref byte[] buffer, int bufferSize)
+		{
+			Assert.IsTrue(buffer.Length >= bufferSize);
+			Array.Fill<byte>(buffer, 0, 0, buffer.Length);
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+		public static void RandomBufferFill(ref byte[] buffer, int bufferSize)
 		{
 			Assert.IsTrue(buffer.Length >= bufferSize);
 			Random.Shared.NextBytes(buffer[0..bufferSize]);
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public static void DefaultBufferPatternFill(ref byte[] buffer, int bufferSize, in byte[] pattern, in IReadOnlyList<int> offsets)
 		{
 			Assert.IsTrue(buffer.Length >= bufferSize);
@@ -154,6 +169,7 @@
 
 		#region Custom Buffer Fill methods
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public static void PatternMinusOneBufferPatternFill(ref byte[] buffer, int bufferSize, in byte[] pattern, in IReadOnlyList<int> offsets)
 		{
 			Assert.IsTrue(buffer.Length >= bufferSize);
@@ -177,6 +193,7 @@
 			}
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public static void NonPatternByteBufferPatternFill(ref byte[] buffer, int bufferSize, in byte[] pattern, in IReadOnlyList<int> offsets)
 		{
 			Assert.IsTrue(offsets.Count > 0);
@@ -203,8 +220,16 @@
 			{
 				buffer[i] = patternExcludedBytes[ Random.Shared.Next(0, excludedCount) ];
 			}
+
+			for (int i = 0; i < offsets.Count; i++)
+			{
+				int offset = offsets[i];
+				Assert.IsTrue(offset <= lastOffset);
+				pattern.CopyTo(buffer, offset);
+			}
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public static void RandomPatternSegmentBufferPatternFill(ref byte[] buffer, int bufferSize, in byte[] pattern, in IReadOnlyList<int> offsets)
 		{
 			Assert.IsTrue(offsets.Count > 0);
