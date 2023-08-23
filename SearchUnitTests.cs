@@ -84,18 +84,18 @@ namespace SearchTest
 				minDistance: DefaultMinDistance,
 				maxDistance: DefaultMaxDistance
 			),
-			//new SearchTestParams
-			//(
-			//	name: "Standard Distance, Standard Pattern, Standard Buffer, Buffer is Pattern minus 1 (end byte)",
-			//	maxTestIterations: DefaultMaxIterations,
-			//	minPatternSize: DefaultMinPattern,
-			//	maxPatternSize: DefaultMaxPattern,
-			//	minBufferSize: DefaultMinBuffer,
-			//	maxBufferSize: DefaultMaxBuffer,
-			//	minDistance: DefaultMinDistance,
-			//	maxDistance: DefaultMaxDistance,
-			//	bufferPatternFill: SearchTestParams.PatternMinusOneBufferPatternFill
-			//),
+			new SearchTestParams
+			(
+				name: "Standard Distance, Standard Pattern, Standard Buffer, Buffer is Pattern minus 1 (end byte)",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: DefaultMinPattern,
+				maxPatternSize: DefaultMaxPattern,
+				minBufferSize: DefaultMinBuffer,
+				maxBufferSize: DefaultMaxBuffer,
+				minDistance: DefaultMinDistance,
+				maxDistance: DefaultMaxDistance,
+				bufferPatternFill: SearchTestParams.PatternMinusOneBufferPatternFill
+			),
 			new SearchTestParams
 			(
 				name: "Standard Distance, Standard Pattern, Standard Buffer, Non-Pattern Byte Buffer Fill (use Pattern shorter than 256)",
