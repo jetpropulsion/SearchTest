@@ -429,7 +429,7 @@ namespace SearchTest
 					test.Reset();
 
 					ReadOnlyMemory<byte> testPattern = test.Pattern;
-					ReadOnlyMemory<byte> testBuffer = test.Buffer;
+					Memory<byte> testBuffer = test.Buffer;
 					int patternSize = testPattern.Length;
 					int bufferSize = testBuffer.Length;
 
@@ -500,22 +500,9 @@ namespace SearchTest
 						//Accumulate duration of search for each generic search algorithm
 						try
 						{
-							//searchWatch.Restart();
-							//genericSearch.Search(testBuffer, 0, bufferSize);
-
-							if (genericSearch.IsEnlargementNeeded())
-							{
-								int enlargedSize;
-								byte[] enlargedBuffer;
-								genericSearch.GetEnlargedBuffer(testBuffer, testPattern, out enlargedSize, out enlargedBuffer);
-								searchWatch.Restart();
-								genericSearch.Search(enlargedBuffer, 0, enlargedSize);
-							}
-							else
-							{
-								searchWatch.Restart();
-								genericSearch.Search(testBuffer, 0, bufferSize);
-							}
+							searchWatch.Restart();
+							genericSearch.FixSearchBuffer(ref testBuffer, bufferSize, testPattern);
+							genericSearch.Search(testBuffer, 0, bufferSize);
 						}
 						catch (Exception ex)
 						{

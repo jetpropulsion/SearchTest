@@ -73,9 +73,8 @@
 			//this.Offsets = null;
 			this.PatternGenerator(this.MinPatternSize, this.MaxPatternSize, out this.PatternSize, out this.Pattern);
 			this.BufferGenerator(this.MinBufferSize, this.MaxBufferSize, this.PatternSize, out this.BufferSize, out this.Buffer);
-			this.BufferFill(ref this.Buffer, this.BufferSize);
-			this.Pattern.CopyTo(this.Buffer, this.BufferSize);	//Copy PatternLocation to the end of the Buffer
 			this.OffsetGenerator(this.BufferSize, this.PatternSize, this.MinDistance, this.MaxDistance, out this.Offsets);
+			this.BufferFill(ref this.Buffer, this.BufferSize);
 			this.BufferPatternFill(ref this.Buffer, this.BufferSize, this.Pattern, this.Offsets);
 		}
 
@@ -109,12 +108,11 @@
 				int nextMax = int.Min(next + distance, lastOffset);
 				int offset = Random.Shared.Next(next, nextMax + 1);
 
-				//Trace.WriteLine($"{nameof(offset)}={offset}, {nameof(next)}={next}, {nameof(patternSize)}={patternSize}, {nameof(distance)}={distance}, {nameof(nextMax)}={nextMax}, {nameof(lastOffset)}={lastOffset}");
-
 				Assert.IsTrue(offset <= lastOffset);
 				result.Add(offset);
 				next = offset + patternSize; //set next generated offset's start boundary
 			}
+
 			//NOTE: do not sort result - this allows overlapping strings
 			offsets = result.ToArray();
 			Assert.IsTrue(offsets.Length > 0);
