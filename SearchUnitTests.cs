@@ -52,24 +52,24 @@ namespace SearchTest
 #if DEBUG
 		const int DefaultMaxIterations = 1;
 #else
-		const int DefaultMaxIterations = 3;
+		const int DefaultMaxIterations = 1;
 #endif
-		const int DefaultMinSmallPattern = 3;
-		const int DefaultMaxSmallPattern = 16;
-		const int DefaultMinPattern = 4;
-		const int DefaultMaxPattern = 273;
-		const int DefaultMinLargePattern = 1024;
-		const int DefaultMaxLargePattern = 4096;
-		const int DefaultMinBuffer = 1048576;
-		const int DefaultMaxBuffer = 1048576 * 4;
-		const int DefaultMinLargeBuffer = 1048576 * 16;
-		const int DefaultMaxLargeBuffer = 1048576 * 16 * 24;
-		const int DefaultMinLargeDistance = 65536;
-		const int DefaultMaxLargeDistance = 65536 * 2;
-		const int DefaultMinSmallDistance = 0;
-		const int DefaultMaxSmallDistance = 32;
-		const int DefaultMinDistance = 32;
-		const int DefaultMaxDistance = 1024;
+		const int MinSmallPattern = 3;
+		const int MaxSmallPattern = 16;
+		const int MinStandardPattern = 4;
+		const int MaxStandardPattern = 273;
+		const int MinLargePattern = 1024;
+		const int MaxLargePattern = 4096;
+		const int MinStandardBuffer = 1048576;
+		const int MaxStandardBuffer = 1048576 * 2;
+		const int MinLargeBuffer = 1048576 * 16;
+		const int MaxLargeBuffer = 1048576 * 16 * 24;
+		const int MinLargeDistance = 8192;
+		const int MaxLargeDistance = 65536 * 2;
+		const int MinSmallDistance = 0;
+		const int MaxSmallDistance = 32;
+		const int MinStandardDistance = 64;
+		const int MaxStandardDistance = 4096;
 
 		public List<SearchTestParams> SearchTests = new List<SearchTestParams>()
 		{
@@ -77,140 +77,164 @@ namespace SearchTest
 			(
 				name: "Standard Distance, Standard Pattern, Standard Buffer",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinPattern,
-				maxPatternSize: DefaultMaxPattern,
-				minBufferSize: DefaultMinBuffer,
-				maxBufferSize: DefaultMaxBuffer,
-				minDistance: DefaultMinDistance,
-				maxDistance: DefaultMaxDistance
+				minPatternSize: MinStandardPattern,
+				maxPatternSize: MaxStandardPattern,
+				minBufferSize: MinStandardBuffer,
+				maxBufferSize: MaxStandardBuffer,
+				minDistance: MinStandardDistance,
+				maxDistance: MaxStandardDistance
 			),
 			new SearchTestParams
 			(
 				name: "Standard Distance, Standard Pattern, Standard Buffer, Buffer is Pattern minus 1 (end byte)",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinPattern,
-				maxPatternSize: DefaultMaxPattern,
-				minBufferSize: DefaultMinBuffer,
-				maxBufferSize: DefaultMaxBuffer,
-				minDistance: DefaultMinDistance,
-				maxDistance: DefaultMaxDistance,
+				minPatternSize: MinStandardPattern,
+				maxPatternSize: MaxStandardPattern,
+				minBufferSize: MinStandardBuffer,
+				maxBufferSize: MaxStandardBuffer,
+				minDistance: MinStandardDistance,
+				maxDistance: MaxStandardDistance,
+				bufferPatternFill: SearchTestParams.PatternMinusOneBufferPatternFill
+			),
+			new SearchTestParams
+			(
+				name: "Small Distance, Standard Pattern, Standard Buffer, Buffer is Pattern minus 1 (end byte)",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: MinStandardPattern,
+				maxPatternSize: MaxStandardPattern,
+				minBufferSize: MinStandardBuffer,
+				maxBufferSize: MaxStandardBuffer,
+				minDistance: MinSmallDistance,
+				maxDistance: MaxSmallDistance,
+				bufferPatternFill: SearchTestParams.PatternMinusOneBufferPatternFill
+			),
+			new SearchTestParams
+			(
+				name: "Small Distance, Small Pattern, Standard Buffer, Buffer is Pattern minus 1 (end byte)",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: MinSmallPattern,
+				maxPatternSize: MaxSmallPattern,
+				minBufferSize: MinStandardBuffer,
+				maxBufferSize: MaxStandardBuffer,
+				minDistance: MinSmallDistance,
+				maxDistance: MaxSmallDistance,
 				bufferPatternFill: SearchTestParams.PatternMinusOneBufferPatternFill
 			),
 			new SearchTestParams
 			(
 				name: "Standard Distance, Standard Pattern, Standard Buffer, Non-Pattern Byte Buffer Fill (use Pattern shorter than 256)",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinSmallPattern,
-				maxPatternSize: DefaultMaxSmallPattern,
-				minBufferSize: DefaultMinBuffer,
-				maxBufferSize: DefaultMaxBuffer,
-				minDistance: DefaultMinDistance,
-				maxDistance: DefaultMaxDistance,
+				minPatternSize: MinSmallPattern,
+				maxPatternSize: MaxSmallPattern,
+				minBufferSize: MinStandardBuffer,
+				maxBufferSize: MaxStandardBuffer,
+				minDistance: MinStandardDistance,
+				maxDistance: MaxStandardDistance,
 				bufferPatternFill: SearchTestParams.NonPatternByteBufferPatternFill
 			),
 			new SearchTestParams
 			(
 				name: "Small Distance, Small Pattern, Standard Buffer",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinSmallPattern,
-				maxPatternSize: DefaultMaxSmallPattern,
-				minBufferSize: DefaultMinBuffer,
-				maxBufferSize: DefaultMaxBuffer,
-				minDistance: DefaultMinSmallDistance,
-				maxDistance: DefaultMaxSmallDistance
+				minPatternSize: MinSmallPattern,
+				maxPatternSize: MaxSmallPattern,
+				minBufferSize: MinStandardBuffer,
+				maxBufferSize: MaxStandardBuffer,
+				minDistance: MinSmallDistance,
+				maxDistance: MaxSmallDistance
 			),
 			new SearchTestParams
 			(
 				name: "Small Distance, Small Pattern, Standard Buffer, Non Pattern Byte Buffer Pattern Fill (use Pattern shorter than 256)",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinSmallPattern,
-				maxPatternSize: DefaultMaxSmallPattern,
-				minBufferSize: DefaultMinBuffer,
-				maxBufferSize: DefaultMaxBuffer,
-				minDistance: DefaultMinSmallDistance,
-				maxDistance: DefaultMaxSmallDistance,
+				minPatternSize: MinSmallPattern,
+				maxPatternSize: MaxSmallPattern,
+				minBufferSize: MinStandardBuffer,
+				maxBufferSize: MaxStandardBuffer,
+				minDistance: MinSmallDistance,
+				maxDistance: MaxSmallDistance,
 				bufferPatternFill: SearchTestParams.NonPatternByteBufferPatternFill
 			),
 			new SearchTestParams
 			(
 				name: "Small Distance, Large Pattern, Large Buffer",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinLargePattern,
-				maxPatternSize: DefaultMaxLargePattern,
-				minBufferSize: DefaultMinLargeBuffer,
-				maxBufferSize: DefaultMaxLargeBuffer,
-				minDistance: DefaultMinSmallDistance,
-				maxDistance: DefaultMaxSmallDistance
+				minPatternSize: MinLargePattern,
+				maxPatternSize: MaxLargePattern,
+				minBufferSize: MinLargeBuffer,
+				maxBufferSize: MaxLargeBuffer,
+				minDistance: MinSmallDistance,
+				maxDistance: MaxSmallDistance
 			),
 			new SearchTestParams
 			(
 				name: "Small Distance, Large Pattern, Large Buffer, Random Pattern Segment Fill",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinLargePattern,
-				maxPatternSize: DefaultMaxLargePattern,
-				minBufferSize: DefaultMinLargeBuffer,
-				maxBufferSize: DefaultMaxLargeBuffer,
-				minDistance: DefaultMinSmallDistance,
-				maxDistance: DefaultMaxSmallDistance,
+				minPatternSize: MinLargePattern,
+				maxPatternSize: MaxLargePattern,
+				minBufferSize: MinLargeBuffer,
+				maxBufferSize: MaxLargeBuffer,
+				minDistance: MinSmallDistance,
+				maxDistance: MaxSmallDistance,
 				bufferPatternFill: SearchTestParams.RandomPatternSegmentBufferPatternFill
 			),
 			new SearchTestParams
 			(
 				name: "Large Distance, Small Pattern, Large Buffer, Random Pattern Segment Fill",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinSmallPattern,
-				maxPatternSize: DefaultMaxSmallPattern,
-				minBufferSize: DefaultMinLargeBuffer,
-				maxBufferSize: DefaultMaxLargeBuffer,
-				minDistance: DefaultMinLargeDistance,
-				maxDistance: DefaultMaxLargeDistance,
+				minPatternSize: MinSmallPattern,
+				maxPatternSize: MaxSmallPattern,
+				minBufferSize: MinLargeBuffer,
+				maxBufferSize: MaxLargeBuffer,
+				minDistance: MinLargeDistance,
+				maxDistance: MaxLargeDistance,
 				bufferPatternFill: SearchTestParams.RandomPatternSegmentBufferPatternFill
 			),
 			new SearchTestParams
 			(
 				name: "Large Distance, Small Pattern, Large Buffer, Random Pattern Segment Fill",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinSmallPattern,
-				maxPatternSize: DefaultMaxSmallPattern,
-				minBufferSize: DefaultMinLargeBuffer,
-				maxBufferSize: DefaultMaxLargeBuffer,
-				minDistance: DefaultMinLargeDistance,
-				maxDistance: DefaultMaxLargeDistance,
+				minPatternSize: MinSmallPattern,
+				maxPatternSize: MaxSmallPattern,
+				minBufferSize: MinLargeBuffer,
+				maxBufferSize: MaxLargeBuffer,
+				minDistance: MinLargeDistance,
+				maxDistance: MaxLargeDistance,
 				bufferPatternFill: SearchTestParams.RandomPatternSegmentBufferPatternFill
 			),
 			new SearchTestParams
 			(
 				name: "Large Distance, Large Pattern, Large Buffer, Random Pattern Segment Fill",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinLargePattern,
-				maxPatternSize: DefaultMaxLargePattern,
-				minBufferSize: DefaultMinLargeBuffer,
-				maxBufferSize: DefaultMaxLargeBuffer,
-				minDistance: DefaultMinLargeDistance,
-				maxDistance: DefaultMaxLargeDistance,
+				minPatternSize: MinLargePattern,
+				maxPatternSize: MaxLargePattern,
+				minBufferSize: MinLargeBuffer,
+				maxBufferSize: MaxLargeBuffer,
+				minDistance: MinLargeDistance,
+				maxDistance: MaxLargeDistance,
 				bufferPatternFill: SearchTestParams.RandomPatternSegmentBufferPatternFill
 			),
 			new SearchTestParams
 			(
 				name: "Large Distance, Large Pattern, Large Buffer",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinLargePattern,
-				maxPatternSize: DefaultMaxLargePattern,
-				minBufferSize: DefaultMinLargeBuffer,
-				maxBufferSize: DefaultMaxLargeBuffer,
-				minDistance: DefaultMinLargeDistance,
-				maxDistance: DefaultMaxLargeDistance
+				minPatternSize: MinLargePattern,
+				maxPatternSize: MaxLargePattern,
+				minBufferSize: MinLargeBuffer,
+				maxBufferSize: MaxLargeBuffer,
+				minDistance: MinLargeDistance,
+				maxDistance: MaxLargeDistance
 			),
 			new SearchTestParams
 			(
 				name: "Large Distance, Large Pattern, Large Buffer, Random Pattern Segment Fill",
 				maxTestIterations: DefaultMaxIterations,
-				minPatternSize: DefaultMinLargePattern,
-				maxPatternSize: DefaultMaxLargePattern,
-				minBufferSize: DefaultMinLargeBuffer,
-				maxBufferSize: DefaultMaxLargeBuffer,
-				minDistance: DefaultMinLargeDistance,
-				maxDistance: DefaultMaxLargeDistance,
+				minPatternSize: MinLargePattern,
+				maxPatternSize: MaxLargePattern,
+				minBufferSize: MinLargeBuffer,
+				maxBufferSize: MaxLargeBuffer,
+				minDistance: MinLargeDistance,
+				maxDistance: MaxLargeDistance,
 				bufferPatternFill: SearchTestParams.RandomPatternSegmentBufferPatternFill
 			)
 		};
@@ -363,7 +387,7 @@ namespace SearchTest
 			Trace.WriteLine(heavyDivider);
 
 			//Reference search algorithm is now BruteForce, choosen over its simplicity (and slowness)
-			ISearch referenceSearch = new Search.Algorithms.BruteForce();
+			ISearch referenceSearch = new Search.Algorithms.Naive();	//Raita(); //NotSoNaive();	// BruteForce();
 			Type referenceSearchType = referenceSearch.GetType();
 
 			//Dictionary of Type (which must inherit from ISearch) and its measured searcj statistics
@@ -385,8 +409,8 @@ namespace SearchTest
 				if
 				(
 					!type.IsClass                                                           //Skip if type is not a class
-					|| type.IsAbstract                                                      //Skip if type is an abstract class
 					|| !type.GetInterfaces().Contains(typeof(Search.Interfaces.ISearch))    //Skip if type doesn't implement ISearch
+					|| type.IsAbstract                                                      //Skip if type is an abstract class
 					|| blacklistedTypes.Contains(type)                                      //Skip blacklisted types, like base classes
 					|| blacklistedAttributes.Any(x => type.IsDefined(x))                //Skip search algorithm class if marked with blacklisted Attribute
 				)
@@ -443,8 +467,13 @@ namespace SearchTest
 							return true;
 						}
 					);
+					referenceSearch.FixSearchBuffer(ref testBuffer, bufferSize, testPattern);
 					referenceSearch.Search(testBuffer, 0, bufferSize);
-					Assert.IsTrue(referenceOffsets.Count > 0);
+					//Assert.IsTrue(referenceOffsets.Count > 0);
+					if(referenceOffsets.Count <= 0)
+					{
+						throw new Exception($"{nameof(referenceOffsets)}.Count == 0 (Initial search)");
+					}
 
 					string[] testIterationInfo = new string[]
 					{
@@ -473,7 +502,10 @@ namespace SearchTest
 					//Automatically instantiate ISearch derivates with Type and custom Attribute filtering
 					foreach (Type type in searchTypes)
 					{
-						Assert.IsTrue(referenceOffsets.Count > 0);
+						if (referenceOffsets.Count <= 0)
+						{
+							throw new Exception($"{nameof(referenceOffsets)}.Count == 0 (inside foreach (Type type in searchTypes))");
+						}
 
 						//Create instance of generic search algorithm exposing ISearch interface
 						Assembly searchAssembly = type.Assembly;

@@ -17,11 +17,11 @@
 		public delegate void BufferFillDelegate(ref byte[] buffer, int bufferSize);
 		public delegate void BufferPatternFillDelegate(ref byte[] buffer, int bufferSize, in byte[] pattern, in IReadOnlyList<int> offsets);
 
-		public OffsetGeneratorDelegate OffsetGenerator = DefaultOffsetGenerator;
-		public PatternGeneratorDelegate PatternGenerator = DefaultPatternGenerator;
-		public BufferGeneratorDelegate BufferGenerator = DefaultBufferGenerator;
-		public BufferFillDelegate BufferFill = DefaultBufferFill;
-		public BufferPatternFillDelegate BufferPatternFill = DefaultBufferPatternFill;
+		public OffsetGeneratorDelegate? OffsetGenerator = DefaultOffsetGenerator;
+		public PatternGeneratorDelegate? PatternGenerator = DefaultPatternGenerator;
+		public BufferGeneratorDelegate? BufferGenerator = DefaultBufferGenerator;
+		public BufferFillDelegate? BufferFill = DefaultBufferFill;
+		public BufferPatternFillDelegate? BufferPatternFill = DefaultBufferPatternFill;
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public SearchTestParams
@@ -71,11 +71,11 @@
 			//this.PatternSize = 0;
 			//this.BufferSize = 0;
 			//this.Offsets = null;
-			this.PatternGenerator(this.MinPatternSize, this.MaxPatternSize, out this.PatternSize, out this.Pattern);
-			this.BufferGenerator(this.MinBufferSize, this.MaxBufferSize, this.PatternSize, out this.BufferSize, out this.Buffer);
-			this.OffsetGenerator(this.BufferSize, this.PatternSize, this.MinDistance, this.MaxDistance, out this.Offsets);
-			this.BufferFill(ref this.Buffer, this.BufferSize);
-			this.BufferPatternFill(ref this.Buffer, this.BufferSize, this.Pattern, this.Offsets);
+			if(this.PatternGenerator != null) this.PatternGenerator(this.MinPatternSize, this.MaxPatternSize, out this.PatternSize, out this.Pattern);
+			if(this.BufferGenerator != null) this.BufferGenerator(this.MinBufferSize, this.MaxBufferSize, this.PatternSize, out this.BufferSize, out this.Buffer);
+			if(this.OffsetGenerator != null) this.OffsetGenerator(this.BufferSize, this.PatternSize, this.MinDistance, this.MaxDistance, out this.Offsets);
+			if(this.BufferFill != null) this.BufferFill(ref this.Buffer, this.BufferSize);
+			if(this.BufferPatternFill != null) this.BufferPatternFill(ref this.Buffer, this.BufferSize, this.Pattern, this.Offsets);
 		}
 
 		public string Name;
