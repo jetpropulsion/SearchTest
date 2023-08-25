@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
     <UserSecretsId>d96dfa9d-8836-4f59-9aad-2b5c16a42e1b</UserSecretsId>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
 	<ItemGroup>

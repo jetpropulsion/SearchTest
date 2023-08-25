@@ -3,7 +3,9 @@ using System.Drawing;
 namespace SearchTest
 {
 	using Microsoft.Extensions.FileSystemGlobbing.Internal.Patterns;
+	using Microsoft.VisualStudio.TestPlatform.CrossPlatEngine;
 	using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+	using Microsoft.VisualStudio.TestPlatform.ObjectModel.Client;
 
 	using Newtonsoft.Json.Linq;
 
@@ -116,6 +118,29 @@ namespace SearchTest
 				maxPatternSize: MaxSmallPattern,
 				minBufferSize: MinStandardBuffer,
 				maxBufferSize: MaxStandardBuffer,
+				minDistance: MinSmallDistance,
+				maxDistance: MaxSmallDistance,
+				bufferPatternFill: SearchTestParams.PatternMinusOneBufferPatternFill
+			),
+			new SearchTestParams
+			(
+				name: "Small Distance, Standard Pattern, Large Buffer",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: MinStandardPattern,
+				maxPatternSize: MaxStandardPattern,
+				minBufferSize: MinLargeBuffer,
+				maxBufferSize: MaxLargeBuffer,
+				minDistance: MinSmallDistance,
+				maxDistance: MaxSmallDistance
+			),
+			new SearchTestParams
+			(
+				name: "Small Distance, Standard Pattern, Large Buffer, Buffer is Pattern minus 1 (end byte)",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: MinStandardPattern,
+				maxPatternSize: MaxStandardPattern,
+				minBufferSize: MinLargeBuffer,
+				maxBufferSize: MaxLargeBuffer,
 				minDistance: MinSmallDistance,
 				maxDistance: MaxSmallDistance,
 				bufferPatternFill: SearchTestParams.PatternMinusOneBufferPatternFill
@@ -384,10 +409,153 @@ namespace SearchTest
 			Assembly assembly = typeof(Search.Interfaces.ISearch).Assembly;
 			ArgumentNullException.ThrowIfNull(assembly, nameof(assembly));
 
+			//string restored = string.Empty; //@"C:\Work3\SearchTest\bin\x64\Release\net7.0\20230825-131859-5006-BerryRavindran.state";
+			string restored = "";	// @"C:\Work3\SearchTest\bin\x64\Release\net7.0\20230825-164025-4586-Raita.state";
+			//string restored = @"20230825-000924-1388-BerryRavindran.state";
+			if (!string.IsNullOrWhiteSpace(restored) && File.Exists(restored))
+			{
+				FileStreamOptions fso = new FileStreamOptions();
+				fso.Share = FileShare.None;
+				fso.Access = FileAccess.Read;
+				fso.Mode = FileMode.Open;
+				fso.BufferSize = 65536;
+				fso.PreallocationSize = 0;
+				//fso.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
+				using (FileStream fs = File.Open(restored, fso))
+				using (BufferedStream bs = new BufferedStream(fs))
+				using (BinaryReader br = new BinaryReader(bs, Encoding.UTF8, false))
+				{
+					string restoredTypeName = br.ReadString();
+					Trace.WriteLine($"{nameof(restoredTypeName)}={restoredTypeName}");
+
+					int restoredPatternLength = br.ReadInt32();
+					ReadOnlyMemory<byte> restoredPattern = br.ReadBytes(restoredPatternLength);
+					Trace.WriteLine($"{nameof(restoredPattern)}={restoredPattern.Length}");
+
+					int restoredBufferSize = br.ReadInt32();
+					int restoredBufferLength = br.ReadInt32();
+					Trace.WriteLine($"{nameof(restoredBufferSize)}={restoredBufferSize}");
+					Trace.WriteLine($"{nameof(restoredBufferLength)}={restoredBufferLength}");
+					Memory<byte> restoredBuffer = br.ReadBytes(restoredBufferLength);
+
+					int restoredGeneratedOffsetsCount = br.ReadInt32();
+					Trace.WriteLine($"{nameof(restoredGeneratedOffsetsCount)}={restoredGeneratedOffsetsCount}");
+					int[] restoredGeneratedOffsets = new int[restoredGeneratedOffsetsCount];
+					for (int i = 0; i < restoredGeneratedOffsetsCount; ++i)
+					{
+						int offset = br.ReadInt32();
+						if(offset < 0 || offset > restoredBufferSize - restoredPatternLength)
+						{
+							Trace.WriteLine($"{nameof(restoredGeneratedOffsets)}: wrong offset at index {i}, offset is {offset}");
+						}
+						else if(!restoredBuffer.Slice(offset, restoredPatternLength).Span.SequenceEqual(restoredPattern.Span))
+						{
+							Trace.WriteLine($"{nameof(restoredGeneratedOffsets)}: wrong offset at index {i}, offset is {offset}, pattern is absent");
+						}
+						restoredGeneratedOffsets[i] = offset;
+						//Trace.WriteLine($"{nameof(restoredGeneratedOffsets)}[{i,3}]={offset}");
+					}
+					Trace.Flush();
+
+					int restoredReferenceOffsetsCount = br.ReadInt32();
+					Trace.WriteLine($"{nameof(restoredReferenceOffsetsCount)}={restoredReferenceOffsetsCount}");
+					int[] restoredReferenceOffsets = new int[restoredReferenceOffsetsCount];
+					for (int i = 0; i < restoredReferenceOffsetsCount; ++i)
+					{
+						int offset = br.ReadInt32();
+						if (offset < 0 || offset > restoredBufferSize - restoredPatternLength)
+						{
+							Trace.WriteLine($"{nameof(restoredReferenceOffsets)}: wrong offset at index {i}, offset is {offset}");
+						}
+						else if (!restoredBuffer.Slice(offset, restoredPatternLength).Span.SequenceEqual(restoredPattern.Span))
+						{
+							Trace.WriteLine($"{nameof(restoredReferenceOffsets)}: pattern is absent for offset at index {i}, offset is {offset}");
+						}
+						restoredReferenceOffsets[i] = offset;
+						//Trace.WriteLine($"{nameof(restoredReferenceOffsets)}[{i,3}]={offset}");
+					}
+					Trace.Flush();
+
+					int restoredOffsetsCount = br.ReadInt32();
+					Trace.WriteLine($"{nameof(restoredOffsetsCount)}={restoredOffsetsCount}");
+					int[] restoredOffsets = new int[restoredOffsetsCount];
+					for (int i = 0; i < restoredOffsetsCount; ++i)
+					{
+						int offset = br.ReadInt32();
+						if (offset < 0 || offset > restoredBufferSize - restoredPatternLength)
+						{
+							Trace.WriteLine($"{nameof(restoredOffsets)}: wrong offset at index {i}, offset is {offset}");
+							//Debugger.Break();
+						}
+						else if (!restoredBuffer.Slice(offset, restoredPatternLength).Span.SequenceEqual(restoredPattern.Span))
+						{
+							Trace.WriteLine($"{nameof(restoredOffsets)}: pattern is absent for offset at index {i}, offset is {offset}");
+							//Debugger.Break();
+						}
+						restoredOffsets[i] = offset;
+						//Trace.WriteLine($"{nameof(restoredOffsets)}[{i,3}]={offset}");
+					}
+					Trace.Flush();
+
+					Debugger.Break();
+
+					ISearch restoredSearch = assembly.CreateInstance(restoredTypeName) as ISearch ?? throw new ArgumentNullException(nameof(restoredSearch));
+					List<int> recalculatedOffsets = new List<int>();
+					restoredSearch.Init(restoredPattern, (offset, caller) =>
+					{
+						recalculatedOffsets.Add(offset);
+						return true;
+					});
+					restoredSearch.FixSearchBuffer(ref restoredBuffer, restoredBufferSize, restoredPattern);
+					restoredSearch.Search(restoredBuffer, 0, restoredBufferSize);
+
+					for (int i = 0; i < recalculatedOffsets.Count; ++i)
+					{
+						int offset = recalculatedOffsets[i];
+						if (offset < 0 || offset > restoredBufferSize - restoredPatternLength)
+						{
+							Trace.WriteLine($"{nameof(recalculatedOffsets)}: wrong offset at index {i}, offset is {offset}");
+						}
+						else if (!restoredBuffer.Slice(offset, restoredPatternLength).Span.SequenceEqual(restoredPattern.Span))
+						{
+							Trace.WriteLine($"{nameof(recalculatedOffsets)}: pattern is absent for offset at index {i}, offset is {offset}");
+						}
+					}
+					Trace.Flush();
+					Debugger.Break();
+
+					List<(string name, IReadOnlyList<int> list)> listOfLists = new();
+					listOfLists.Add((name: nameof(recalculatedOffsets), list: recalculatedOffsets));
+					listOfLists.Add((name: nameof(restoredGeneratedOffsets), list: restoredGeneratedOffsets));
+					listOfLists.Add((name: nameof(restoredReferenceOffsets), list: restoredReferenceOffsets));
+					listOfLists.Add((name: nameof(restoredOffsets), list: restoredOffsets));
+
+					for (int i = 0; i < listOfLists.Count; ++i)
+					{
+						for(int j = i; j < listOfLists.Count; ++j)
+						{
+							string firstName = listOfLists[i].Item1;
+							string secondName = listOfLists[j].Item1;
+							IReadOnlyList<int> first = listOfLists[i].Item2;
+							IReadOnlyList<int> second = listOfLists[j].Item2;
+							bool equal = first.Count == second.Count && first.SequenceEqual(second);
+							if(!equal)
+							{
+								Trace.WriteLine($"{firstName} ({first.Count}) not equal to {secondName} ({second.Count})");
+							}
+						}
+					}
+
+				} //END: using(BinaryReader...
+
+				Process.GetCurrentProcess().Kill();
+				Debugger.Break();
+			}
+
 			Trace.WriteLine(heavyDivider);
 
 			//Reference search algorithm is now BruteForce, choosen over its simplicity (and slowness)
-			ISearch referenceSearch = new Search.Algorithms.Naive();	//Raita(); //NotSoNaive();	// BruteForce();
+			ISearch referenceSearch = new Search.Algorithms.BruteForce();	//Raita(); //NotSoNaive();	// BruteForce();
 			Type referenceSearchType = referenceSearch.GetType();
 
 			//Dictionary of Type (which must inherit from ISearch) and its measured searcj statistics
@@ -529,11 +697,18 @@ namespace SearchTest
 						initWatch.Stop();
 						_ = statistics[type][testIteration].IncrementInitializationTime(initWatch.Elapsed.Ticks);
 
+						try
+						{
+							genericSearch.FixSearchBuffer(ref testBuffer, bufferSize, testPattern);
+						}
+						catch (Exception ex)
+						{
+							Assert.Fail($"[FIX EXCEPTION] Type={type}, Details:{ex}", ex);
+						}
 						//Accumulate duration of search for each generic search algorithm
 						try
 						{
 							searchWatch.Restart();
-							genericSearch.FixSearchBuffer(ref testBuffer, bufferSize, testPattern);
 							genericSearch.Search(testBuffer, 0, bufferSize);
 						}
 						catch (Exception ex)
@@ -548,9 +723,55 @@ namespace SearchTest
 						{
 							if (!EqualOffsets(type.FullName!, statistics[type][testIteration].Offsets, referenceSearchType.FullName!, referenceOffsets))
 							{
-								Assert.Fail($"{type.FullName} (Count={statistics[type][testIteration].Offsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
+								List<int> offsets = statistics[type][testIteration].Offsets;
+
+								string path = $"{DateTime.Now.ToString(@"yyyyMMdd-HHmmss-ffff")}-{type.Name}.state";
+								using(FileStream fs = File.Create(path))
+								using(BufferedStream bs = new BufferedStream(fs))
+								using(BinaryWriter bw = new BinaryWriter(bs, Encoding.UTF8, false))
+								{
+									List<string> stateMessages = new List<string>();
+
+									stateMessages.Add($"Dumping state path: \"{path}\" for {type.FullName!}");
+
+									bw.Write(type.FullName!);
+
+									bw.Write(testPattern.Length);
+									stateMessages.Add($"pattern length: {testPattern.Length}");
+									bw.Write(testPattern.Span);
+
+									bw.Write(bufferSize);
+									stateMessages.Add($"buffer size: {bufferSize}");
+									bw.Write(testBuffer.Length);
+									stateMessages.Add($"buffer length: {testBuffer.Length}");
+									bw.Write(testBuffer.Span);
+
+									//Generated offsets
+									stateMessages.Add($"generated offsets: {test.Offsets.Length}");
+									bw.Write(test.Offsets.Length);
+									test.Offsets.ToList().ForEach(x => bw.Write(x));
+
+									//Reference ISearch offsets (any search algorithm instance assigned to referenceSearch, used in reference timing calculation)
+									stateMessages.Add($"reference ({referenceSearchType.FullName!}) offsets: {referenceOffsets.Count}");
+									bw.Write(referenceOffsets.Count);
+									referenceOffsets.ForEach(x => bw.Write(x));
+
+									//Current ISearch offsets
+									stateMessages.Add($"current ({type.FullName}) offsets: {test.Offsets.Length}");
+									bw.Write(offsets.Count);
+									offsets.ForEach(x => bw.Write(x));
+
+									bw.Flush();
+									bs.Flush();
+									fs.Flush();
+									bw.Close();
+
+									Trace.WriteLine(string.Join(System.Environment.NewLine, stateMessages));
+								}
+								Assert.Fail($"{type.FullName} (Count={offsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
 							}
 						}
+
 					} //END: foreach (Type type in searchTypes)
 
 				} //END: for (int testSubIteration = 1; testSubIteration <= test.MaxIterations; ++testSubIteration)
