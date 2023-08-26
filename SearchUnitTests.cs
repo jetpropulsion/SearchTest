@@ -385,16 +385,7 @@ namespace SearchTest
 
 			Trace.WriteLine($"{firstName} count: {firstOnly.Count()}");
 			Trace.WriteLine($"{secondName} count: {secondOnly.Count()}");
-#if TRACE
-			for (int i = 0; i < firstOnly.Count(); ++i)
-			{
-				Trace.WriteLine($"{firstName} only at position {i}: {firstOnly.ElementAt(i)}");
-			}
-			for (int i = 0; i < secondOnly.Count(); ++i)
-			{
-				Trace.WriteLine($"{secondName} only at position {i}: {secondOnly.ElementAt(i)}");
-			}
-#endif
+
 			return false;
 		}
 
@@ -409,9 +400,8 @@ namespace SearchTest
 			Assembly assembly = typeof(Search.Interfaces.ISearch).Assembly;
 			ArgumentNullException.ThrowIfNull(assembly, nameof(assembly));
 
-			//string restored = string.Empty; //@"C:\Work3\SearchTest\bin\x64\Release\net7.0\20230825-131859-5006-BerryRavindran.state";
-			string restored = "";	// @"C:\Work3\SearchTest\bin\x64\Release\net7.0\20230825-164025-4586-Raita.state";
-			//string restored = @"20230825-000924-1388-BerryRavindran.state";
+			string restored = string.Empty;
+			//string restored = @"C:\Work3\SearchTest\bin\x64\Release\net7.0\20230826-121044-4566-BackwardFast.state";
 			if (!string.IsNullOrWhiteSpace(restored) && File.Exists(restored))
 			{
 				FileStreamOptions fso = new FileStreamOptions();
@@ -453,7 +443,6 @@ namespace SearchTest
 							Trace.WriteLine($"{nameof(restoredGeneratedOffsets)}: wrong offset at index {i}, offset is {offset}, pattern is absent");
 						}
 						restoredGeneratedOffsets[i] = offset;
-						//Trace.WriteLine($"{nameof(restoredGeneratedOffsets)}[{i,3}]={offset}");
 					}
 					Trace.Flush();
 
@@ -465,14 +454,13 @@ namespace SearchTest
 						int offset = br.ReadInt32();
 						if (offset < 0 || offset > restoredBufferSize - restoredPatternLength)
 						{
-							Trace.WriteLine($"{nameof(restoredReferenceOffsets)}: wrong offset at index {i}, offset is {offset}");
+							Trace.WriteLine($"{nameof(restoredReferenceOffsets)}: OFFSET OUT OF BOUNDS at index {i}, offset is {offset}");
 						}
 						else if (!restoredBuffer.Slice(offset, restoredPatternLength).Span.SequenceEqual(restoredPattern.Span))
 						{
-							Trace.WriteLine($"{nameof(restoredReferenceOffsets)}: pattern is absent for offset at index {i}, offset is {offset}");
+							Trace.WriteLine($"{nameof(restoredReferenceOffsets)}: PATTERN IS ABSENT for offset at index {i}, offset is {offset}");
 						}
 						restoredReferenceOffsets[i] = offset;
-						//Trace.WriteLine($"{nameof(restoredReferenceOffsets)}[{i,3}]={offset}");
 					}
 					Trace.Flush();
 
@@ -485,19 +473,14 @@ namespace SearchTest
 						if (offset < 0 || offset > restoredBufferSize - restoredPatternLength)
 						{
 							Trace.WriteLine($"{nameof(restoredOffsets)}: wrong offset at index {i}, offset is {offset}");
-							//Debugger.Break();
 						}
 						else if (!restoredBuffer.Slice(offset, restoredPatternLength).Span.SequenceEqual(restoredPattern.Span))
 						{
 							Trace.WriteLine($"{nameof(restoredOffsets)}: pattern is absent for offset at index {i}, offset is {offset}");
-							//Debugger.Break();
 						}
 						restoredOffsets[i] = offset;
-						//Trace.WriteLine($"{nameof(restoredOffsets)}[{i,3}]={offset}");
 					}
 					Trace.Flush();
-
-					Debugger.Break();
 
 					ISearch restoredSearch = assembly.CreateInstance(restoredTypeName) as ISearch ?? throw new ArgumentNullException(nameof(restoredSearch));
 					List<int> recalculatedOffsets = new List<int>();
@@ -522,7 +505,6 @@ namespace SearchTest
 						}
 					}
 					Trace.Flush();
-					Debugger.Break();
 
 					List<(string name, IReadOnlyList<int> list)> listOfLists = new();
 					listOfLists.Add((name: nameof(recalculatedOffsets), list: recalculatedOffsets));
@@ -532,12 +514,12 @@ namespace SearchTest
 
 					for (int i = 0; i < listOfLists.Count; ++i)
 					{
-						for(int j = i; j < listOfLists.Count; ++j)
+						for(int j = i + 1; j < listOfLists.Count; ++j)
 						{
-							string firstName = listOfLists[i].Item1;
-							string secondName = listOfLists[j].Item1;
-							IReadOnlyList<int> first = listOfLists[i].Item2;
-							IReadOnlyList<int> second = listOfLists[j].Item2;
+							string firstName = listOfLists[i].name;
+							string secondName = listOfLists[j].name;
+							IReadOnlyList<int> first = listOfLists[i].list;
+							IReadOnlyList<int> second = listOfLists[j].list;
 							bool equal = first.Count == second.Count && first.SequenceEqual(second);
 							if(!equal)
 							{
@@ -545,17 +527,20 @@ namespace SearchTest
 							}
 						}
 					}
+					Trace.Flush();
 
 				} //END: using(BinaryReader...
+				Trace.Flush();
 
-				Process.GetCurrentProcess().Kill();
+				Assert.Fail();
 				Debugger.Break();
+				Process.GetCurrentProcess().Kill();	//This is the end
 			}
 
 			Trace.WriteLine(heavyDivider);
 
-			//Reference search algorithm is now BruteForce, choosen over its simplicity (and slowness)
-			ISearch referenceSearch = new Search.Algorithms.BruteForce();	//Raita(); //NotSoNaive();	// BruteForce();
+			//Reference search algorithm is now BruteForce, choosen over its simplicity, correctness (and slowness)
+			ISearch referenceSearch = new Search.Algorithms.BruteForce();
 			Type referenceSearchType = referenceSearch.GetType();
 
 			//Dictionary of Type (which must inherit from ISearch) and its measured searcj statistics
@@ -637,11 +622,6 @@ namespace SearchTest
 					);
 					referenceSearch.FixSearchBuffer(ref testBuffer, bufferSize, testPattern);
 					referenceSearch.Search(testBuffer, 0, bufferSize);
-					//Assert.IsTrue(referenceOffsets.Count > 0);
-					if(referenceOffsets.Count <= 0)
-					{
-						throw new Exception($"{nameof(referenceOffsets)}.Count == 0 (Initial search)");
-					}
 
 					string[] testIterationInfo = new string[]
 					{
@@ -659,7 +639,6 @@ namespace SearchTest
 					//{
 					//	Assert.Fail($"{nameof(test.Offsets)} (Count={test.Offsets.Length}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
 					//}
-
 
 					Stopwatch initWatch = new();
 					Stopwatch searchWatch = new();
@@ -697,6 +676,7 @@ namespace SearchTest
 						initWatch.Stop();
 						_ = statistics[type][testIteration].IncrementInitializationTime(initWatch.Elapsed.Ticks);
 
+						//If algorithm needs buffer extension (to be able to stop), it will override FixSearchBuffer() in its implementation
 						try
 						{
 							genericSearch.FixSearchBuffer(ref testBuffer, bufferSize, testPattern);
@@ -705,6 +685,7 @@ namespace SearchTest
 						{
 							Assert.Fail($"[FIX EXCEPTION] Type={type}, Details:{ex}", ex);
 						}
+
 						//Accumulate duration of search for each generic search algorithm
 						try
 						{
@@ -718,14 +699,14 @@ namespace SearchTest
 						searchWatch.Stop();
 						_ = statistics[type][testIteration].IncrementSearchTime(searchWatch.Elapsed.Ticks);
 
-						//Check if offsets of the found pattern returned by generic algorithm is equal to firstOnly offsets of the pattern
-						if (!type.Equals(referenceSearchType))
+						//Check if offsets of the found pattern returned by generic algorithm (other than reference) is equal to reference offsets
+						if (!type.Equals(referenceSearchType) && !EqualOffsets(type.FullName!, statistics[type][testIteration].Offsets, referenceSearchType.FullName!, referenceOffsets))
 						{
-							if (!EqualOffsets(type.FullName!, statistics[type][testIteration].Offsets, referenceSearchType.FullName!, referenceOffsets))
-							{
+								//If mismatched number of offsets or their values differ, dump all the relevant states to a file
 								List<int> offsets = statistics[type][testIteration].Offsets;
 
 								string path = $"{DateTime.Now.ToString(@"yyyyMMdd-HHmmss-ffff")}-{type.Name}.state";
+								//Path.Combine()
 								using(FileStream fs = File.Create(path))
 								using(BufferedStream bs = new BufferedStream(fs))
 								using(BinaryWriter bw = new BinaryWriter(bs, Encoding.UTF8, false))
@@ -769,7 +750,6 @@ namespace SearchTest
 									Trace.WriteLine(string.Join(System.Environment.NewLine, stateMessages));
 								}
 								Assert.Fail($"{type.FullName} (Count={offsets.Count}) not equal to {nameof(referenceOffsets)} (Count={referenceOffsets.Count})");
-							}
 						}
 
 					} //END: foreach (Type type in searchTypes)
@@ -781,6 +761,7 @@ namespace SearchTest
 				SearchStatistics subTotal;
 				AggregateStatistics(searchTypes, statistics, testIteration, 1, out subTotalTypes, out subTotal);
 				WriteStats(subTotalTypes, referenceSearchType, subTotal);
+
 				Trace.WriteLine(lightDivider);      //"#@@#"
 
 			} //END: for (int testIteration = 0; testIteration < SearchTests.Count; ++testIteration)
