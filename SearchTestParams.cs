@@ -23,6 +23,25 @@
 		public BufferFillDelegate? BufferFill = DefaultBufferFill;
 		public BufferPatternFillDelegate? BufferPatternFill = DefaultBufferPatternFill;
 
+		public class RangeDefinition
+		{
+			public readonly string Name;
+			public readonly int Min;
+			public readonly int Max;
+			public RangeDefinition(string name, int min, int max)
+			{
+				this.Name = name;
+				this.Min = min;
+				this.Max = max;
+			}
+		};
+
+		public class PatternDefinition : RangeDefinition { public PatternDefinition(string name, int min, int max) : base(name, min, max) { } };
+		public class BufferDefinition : RangeDefinition { public BufferDefinition(string name, int min, int max) : base(name, min, max) { } };
+		public class DistanceDefinition : RangeDefinition { public DistanceDefinition(string name, int min, int max) : base(name, min, max) { } };
+		public class IterationsDefinition : RangeDefinition { public IterationsDefinition(string name, int min, int max) : base(name, min, max) { } };
+
+
 		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public SearchTestParams
 		(

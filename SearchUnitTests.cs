@@ -11,6 +11,7 @@ namespace SearchTest
 
 	using Search.Interfaces;
 
+	using System;
 	using System.Collections.Concurrent;
 	using System.Collections.Generic;
 	using System.Diagnostics;
@@ -51,6 +52,20 @@ namespace SearchTest
 		public static readonly string stringLightVerticalLine = charLightVerticalLine.ToString();
 		public static readonly string stringHeavyVerticalLine = charHeavyVerticalLine.ToString();
 
+		public class SmallPattern : SearchTestParams.PatternDefinition { public SmallPattern() : base(@"Small Pattern", 3, 16) { } };
+		public class StandardPattern : SearchTestParams.PatternDefinition { public StandardPattern() : base(@"Standard Pattern", 4, 273) { } };
+		public class LargePattern : SearchTestParams.PatternDefinition { public LargePattern() : base(@"Large Pattern", 1024, 4096) { } };
+
+		public class SmallBuffer : SearchTestParams.BufferDefinition { public SmallBuffer() : base(nameof(SmallBuffer), 1048576, 1048576 * 2) { } };
+		public class StandardBuffer : SearchTestParams.BufferDefinition { public StandardBuffer() : base(nameof(StandardBuffer), 1048576 * 4, 1048576 * 16) { } };
+		public class LargeBuffer : SearchTestParams.BufferDefinition { public LargeBuffer() : base(nameof(LargeBuffer), 1048576 * 16, 1048576 * 24) { } };
+
+		public class SmallDistance : SearchTestParams.DistanceDefinition { public SmallDistance() : base(nameof(SmallDistance), 0, 32) { } };
+		public class StandardDistance : SearchTestParams.DistanceDefinition { public StandardDistance() : base(nameof(StandardDistance), 64, 4096) { } };
+		public class LargeDistance : SearchTestParams.DistanceDefinition { public LargeDistance() : base(nameof(LargeDistance), 8192, 65536 * 2) { } };
+
+		public class SmallIterations : SearchTestParams.IterationsDefinition { public SmallIterations() : base(nameof(SmallIterations), 1, 10) {} };
+
 #if DEBUG
 		const int DefaultMaxIterations = 1;
 #else
@@ -62,6 +77,8 @@ namespace SearchTest
 		const int MaxStandardPattern = 273;
 		const int MinLargePattern = 1024;
 		const int MaxLargePattern = 4096;
+		const int MinSmallBuffer = 65536 * 4;
+		const int MaxSmallBuffer = 1048576;
 		const int MinStandardBuffer = 1048576;
 		const int MaxStandardBuffer = 1048576 * 2;
 		const int MinLargeBuffer = 1048576 * 16;
@@ -75,6 +92,17 @@ namespace SearchTest
 
 		public List<SearchTestParams> SearchTests = new List<SearchTestParams>()
 		{
+			new SearchTestParams
+			(
+				name: "Small Distance, Small Pattern, Small Buffer",
+				maxTestIterations: DefaultMaxIterations,
+				minPatternSize: MinSmallPattern,
+				maxPatternSize: MaxSmallPattern,
+				minBufferSize: MinSmallBuffer,
+				maxBufferSize: MaxSmallBuffer,
+				minDistance: MinSmallDistance,
+				maxDistance: MaxSmallDistance
+			),
 			new SearchTestParams
 			(
 				name: "Standard Distance, Standard Pattern, Standard Buffer",
@@ -400,9 +428,25 @@ namespace SearchTest
 			Assembly assembly = typeof(Search.Interfaces.ISearch).Assembly;
 			ArgumentNullException.ThrowIfNull(assembly, nameof(assembly));
 
-			string restored = string.Empty;
-			//string restored = @"C:\Work3\SearchTest\bin\x64\Release\net7.0\20230826-121044-4566-BackwardFast.state";
-			if (!string.IsNullOrWhiteSpace(restored) && File.Exists(restored))
+			//Reference search algorithm is now BruteForce, choosen over its simplicity, correctness (and slowness)
+			ISearch referenceSearch = new Search.Algorithms.BruteForce();
+			Type referenceSearchType = referenceSearch.GetType();
+
+			//Blacklists
+			HashSet<Type> blacklistedTypes = new HashSet<Type>()
+			{
+				typeof(Search.Common.SearchBase)
+			};
+			List<Type> blacklistedAttributes = new List<Type>()
+			{
+				typeof(Search.Attributes.UnstableAttribute),
+				//typeof(Search.Attributes.ExperimentalAttribute),
+				//typeof(Search.Attributes.SlowAttribute),
+			};
+
+			string stateFilePath = string.Empty;
+			//string stateFilePath = @"C:\Work3\SearchTest\bin\x64\Debug\net7.0\20230826-222556-4417-FastSearch.state";
+			if (!string.IsNullOrWhiteSpace(stateFilePath) && File.Exists(stateFilePath))
 			{
 				FileStreamOptions fso = new FileStreamOptions();
 				fso.Share = FileShare.None;
@@ -411,12 +455,46 @@ namespace SearchTest
 				fso.BufferSize = 65536;
 				fso.PreallocationSize = 0;
 				//fso.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
-				using (FileStream fs = File.Open(restored, fso))
+				using (FileStream fs = File.Open(stateFilePath, fso))
 				using (BufferedStream bs = new BufferedStream(fs))
 				using (BinaryReader br = new BinaryReader(bs, Encoding.UTF8, false))
 				{
+					int schemaVersion = br.ReadInt32();     //this binary schema version, if element is added or removed, this should be increased and handled
+					Trace.WriteLine($"{nameof(schemaVersion)}={schemaVersion}");
+					int version = br.ReadInt32();
+					/*
+														int majorVersion = 1;
+														int minorVersion = 0;
+														int buildNumber = 11;
+														int version = majorVersion;
+														version <<= 8;
+														version |= minorVersion;
+														version <<= 16;
+														version |= buildNumber;
+														bw.Write(version);
+
+					 */
+					int buildNumber = version & 0xffff;
+					int minorVersion = (version >> 16) & 0xff;
+					int majorVersion = (version >> 24) & 0xff;
+					Trace.WriteLine($"{nameof(version)}={version}");
+					Trace.WriteLine($"{nameof(majorVersion)}={majorVersion}");
+					Trace.WriteLine($"{nameof(minorVersion)}={minorVersion}");
+					Trace.WriteLine($"{nameof(buildNumber)}={buildNumber}");
+
+					string processArchitecture = br.ReadString();
+					Trace.WriteLine($"{nameof(processArchitecture)}={processArchitecture}");
+					string osArchitecture = br.ReadString();
+					Trace.WriteLine($"{nameof(osArchitecture)}={osArchitecture}");
+					string frameworkDescription = br.ReadString();
+					Trace.WriteLine($"{nameof(frameworkDescription)}={frameworkDescription}");
+					string runtimeIdentifier = br.ReadString();
+					Trace.WriteLine($"{nameof(runtimeIdentifier)}={runtimeIdentifier}");
+
 					string restoredTypeName = br.ReadString();
 					Trace.WriteLine($"{nameof(restoredTypeName)}={restoredTypeName}");
+					string restoredReferenceTypeName = br.ReadString();
+					Trace.WriteLine($"{nameof(restoredReferenceTypeName)}={restoredReferenceTypeName}");
 
 					int restoredPatternLength = br.ReadInt32();
 					ReadOnlyMemory<byte> restoredPattern = br.ReadBytes(restoredPatternLength);
@@ -528,6 +606,7 @@ namespace SearchTest
 						}
 					}
 					Trace.Flush();
+					Debugger.Break();
 
 				} //END: using(BinaryReader...
 				Trace.Flush();
@@ -536,27 +615,46 @@ namespace SearchTest
 				Debugger.Break();
 				Process.GetCurrentProcess().Kill();	//This is the end
 			}
+/*
+			Type patternType = typeof(SearchTestParams.PatternDefinition);
+			Type bufferType = typeof(SearchTestParams.BufferDefinition);
+			Type distanceType = typeof(SearchTestParams.DistanceDefinition);
+			Type interationsType = typeof(SearchTestParams.IterationsDefinition);
+			Type[] assemblyTypes = this.GetType().Assembly.GetTypes();
+
+			Type[] patternDefinitions = assemblyTypes.Where(x => !x.Equals(patternType) && x.IsAssignableTo(patternType)).ToArray();
+			foreach(Type patternDefinition in patternDefinitions)
+			{
+				Trace.WriteLine($"##### {nameof(patternDefinition)} => {patternDefinition.FullName!}");
+			}
+
+			Type[] bufferDefinitions = assemblyTypes.Where(x => !x.Equals(bufferType) && x.IsAssignableTo(bufferType)).ToArray();
+			foreach (Type bufferDefinition in bufferDefinitions)
+			{
+				Trace.WriteLine($"##### {nameof(bufferDefinition)} => {bufferDefinition.FullName!}");
+			}
+
+			Type[] distanceDefinitions = assemblyTypes.Where(x => !x.Equals(distanceType) && x.IsAssignableTo(distanceType)).ToArray();
+			foreach (Type distanceDefinition in distanceDefinitions)
+			{
+				Trace.WriteLine($"##### {nameof(distanceDefinition)} => {distanceDefinition.FullName!}");
+			}
+
+			Type[] iterationDefinitions = assemblyTypes.Where(x => !x.Equals(interationsType) && x.IsAssignableTo(interationsType)).ToArray();
+			foreach (Type iterationDefinition in iterationDefinitions)
+			{
+				Trace.WriteLine($"##### {nameof(iterationDefinition)} => {iterationDefinition.FullName!}");
+			}
+
+			SearchTests.Clear();
+*/
+
 
 			Trace.WriteLine(heavyDivider);
 
-			//Reference search algorithm is now BruteForce, choosen over its simplicity, correctness (and slowness)
-			ISearch referenceSearch = new Search.Algorithms.BruteForce();
-			Type referenceSearchType = referenceSearch.GetType();
-
-			//Dictionary of Type (which must inherit from ISearch) and its measured searcj statistics
+			//Dictionary of Type (which must inherit from ISearch) and its measured search statistics
 			Dictionary<Type, SearchStatistics[]> statistics = new();
 
-			//Blacklists
-			HashSet<Type> blacklistedTypes = new HashSet<Type>()
-			{
-				typeof(Search.Common.SearchBase)
-			};
-			List<Type> blacklistedAttributes = new List<Type>()
-			{
-				typeof(Search.Attributes.UnstableAttribute),
-				//typeof(Search.Attributes.ExperimentalAttribute),
-				typeof(Search.Attributes.SlowAttribute),
-			};
 			foreach (Type type in ((TypeInfo[])assembly.DefinedTypes).Select(t => t.UnderlyingSystemType))
 			{
 				if
@@ -626,12 +724,12 @@ namespace SearchTest
 					string[] testIterationInfo = new string[]
 					{
 						$"{DateTime.Now.ToString(@"yyyy-MM-dd HH:mm:ss.ffffzzz")}"
-						, $"#{(testSubIteration + 1)}/{test.MaxIterations}"
+						, test.MaxIterations == 1 ? string.Empty : $"#{(testSubIteration + 1)}/{test.MaxIterations}"
 						, $"{nameof(test.PatternSize)}={test.PatternSize}"
 						, $"{nameof(test.BufferSize)}={test.BufferSize}"
 						, $"{nameof(referenceOffsets)}={referenceOffsets.Count}"
 					};
-					Trace.WriteLine(string.Join(@", ", testIterationInfo));
+					Trace.WriteLine(string.Join(@", ", testIterationInfo.Where(x => !string.IsNullOrEmpty(x))));
 
 					//Compare generated vs. firstOnly search gathered offsets
 					//NOTE: this check should be skipped, if overlapping test strings or randomly generated sequences are used
@@ -699,6 +797,14 @@ namespace SearchTest
 						searchWatch.Stop();
 						_ = statistics[type][testIteration].IncrementSearchTime(searchWatch.Elapsed.Ticks);
 
+						//If algorithm enlarged the buffer, compact it again to ensure that next algorithm would not reuse the existing enlargement (and cover possible lack of fixing)
+						if(testBuffer.Length > bufferSize)
+						{
+							byte[] newTestBuffer = new byte[bufferSize];
+							testBuffer.Slice(0, bufferSize).CopyTo(newTestBuffer);
+							testBuffer = newTestBuffer;
+						}
+
 						//Check if offsets of the found pattern returned by generic algorithm (other than reference) is equal to reference offsets
 						if (!type.Equals(referenceSearchType) && !EqualOffsets(type.FullName!, statistics[type][testIteration].Offsets, referenceSearchType.FullName!, referenceOffsets))
 						{
@@ -715,7 +821,30 @@ namespace SearchTest
 
 									stateMessages.Add($"Dumping state path: \"{path}\" for {type.FullName!}");
 
+									int schemaVersion = 1;
+									bw.Write(schemaVersion);
+
+									int majorVersion = 1;
+									int minorVersion = 0;
+									int buildNumber = 11;
+									int version = majorVersion;
+									version <<= 8;
+									version |= minorVersion;
+									version <<= 16;
+									version |= buildNumber;
+									bw.Write(version);
+
+									string processArchitecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString();
+									bw.Write(processArchitecture);
+									string osArchitecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString();
+									bw.Write(osArchitecture);
+									string frameworkDescription = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
+									bw.Write(frameworkDescription);
+									string runtimeIdentifier = System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
+									bw.Write(runtimeIdentifier);
+
 									bw.Write(type.FullName!);
+									bw.Write(referenceSearchType.FullName!);
 
 									bw.Write(testPattern.Length);
 									stateMessages.Add($"pattern length: {testPattern.Length}");
