@@ -19,6 +19,7 @@ namespace SearchTest
 	using System.Runtime.InteropServices;
 	using System.Text;
 	using System.Xml.Linq;
+	using static SearchTest.SearchTestParams;
 
 	[TestClass]
 	public class SearchUnitTests
@@ -52,9 +53,9 @@ namespace SearchTest
 		public static readonly string stringLightVerticalLine = charLightVerticalLine.ToString();
 		public static readonly string stringHeavyVerticalLine = charHeavyVerticalLine.ToString();
 
-		public class SmallPattern : SearchTestParams.PatternDefinition { public SmallPattern() : base(@"Small Pattern", 3, 16) { } };
-		public class StandardPattern : SearchTestParams.PatternDefinition { public StandardPattern() : base(@"Standard Pattern", 4, 273) { } };
-		public class LargePattern : SearchTestParams.PatternDefinition { public LargePattern() : base(@"Large Pattern", 1024, 4096) { } };
+		public class SmallPattern : SearchTestParams.PatternDefinition { public SmallPattern() : base(nameof(SmallPattern), 3, 16) { } };
+		public class StandardPattern : SearchTestParams.PatternDefinition { public StandardPattern() : base(nameof(StandardPattern), 4, 273) { } };
+		public class LargePattern : SearchTestParams.PatternDefinition { public LargePattern() : base(nameof(LargePattern), 1024, 4096) { } };
 
 		public class SmallBuffer : SearchTestParams.BufferDefinition { public SmallBuffer() : base(nameof(SmallBuffer), 1048576, 1048576 * 2) { } };
 		public class StandardBuffer : SearchTestParams.BufferDefinition { public StandardBuffer() : base(nameof(StandardBuffer), 1048576 * 4, 1048576 * 16) { } };
@@ -65,6 +66,7 @@ namespace SearchTest
 		public class LargeDistance : SearchTestParams.DistanceDefinition { public LargeDistance() : base(nameof(LargeDistance), 8192, 65536 * 2) { } };
 
 		public class SmallIterations : SearchTestParams.IterationsDefinition { public SmallIterations() : base(nameof(SmallIterations), 1, 10) {} };
+		public class StandardIterations : SearchTestParams.IterationsDefinition { public StandardIterations() : base(nameof(StandardIterations), 10, 100) { } };
 
 #if DEBUG
 		const int DefaultMaxIterations = 1;
@@ -615,39 +617,105 @@ namespace SearchTest
 				Debugger.Break();
 				Process.GetCurrentProcess().Kill();	//This is the end
 			}
-/*
+
 			Type patternType = typeof(SearchTestParams.PatternDefinition);
 			Type bufferType = typeof(SearchTestParams.BufferDefinition);
 			Type distanceType = typeof(SearchTestParams.DistanceDefinition);
 			Type interationsType = typeof(SearchTestParams.IterationsDefinition);
+
 			Type[] assemblyTypes = this.GetType().Assembly.GetTypes();
 
 			Type[] patternDefinitions = assemblyTypes.Where(x => !x.Equals(patternType) && x.IsAssignableTo(patternType)).ToArray();
-			foreach(Type patternDefinition in patternDefinitions)
-			{
-				Trace.WriteLine($"##### {nameof(patternDefinition)} => {patternDefinition.FullName!}");
-			}
-
 			Type[] bufferDefinitions = assemblyTypes.Where(x => !x.Equals(bufferType) && x.IsAssignableTo(bufferType)).ToArray();
-			foreach (Type bufferDefinition in bufferDefinitions)
-			{
-				Trace.WriteLine($"##### {nameof(bufferDefinition)} => {bufferDefinition.FullName!}");
-			}
-
 			Type[] distanceDefinitions = assemblyTypes.Where(x => !x.Equals(distanceType) && x.IsAssignableTo(distanceType)).ToArray();
-			foreach (Type distanceDefinition in distanceDefinitions)
-			{
-				Trace.WriteLine($"##### {nameof(distanceDefinition)} => {distanceDefinition.FullName!}");
-			}
-
 			Type[] iterationDefinitions = assemblyTypes.Where(x => !x.Equals(interationsType) && x.IsAssignableTo(interationsType)).ToArray();
-			foreach (Type iterationDefinition in iterationDefinitions)
+			SearchTestParams.BufferPatternFillDelegate[] delegateDefinitions =
 			{
-				Trace.WriteLine($"##### {nameof(iterationDefinition)} => {iterationDefinition.FullName!}");
+				SearchTestParams.DirectBufferPatternFill,
+				SearchTestParams.PatternMinusOneBufferPatternFill,
+				SearchTestParams.RandomPatternSegmentBufferPatternFill
+			};
+			int[] currentLengths = new int[]
+			{
+				patternDefinitions.Length,
+				bufferDefinitions.Length,
+				distanceDefinitions.Length,
+				iterationDefinitions.Length,
+				delegateDefinitions.Length
+			};
+			int[] currentCounter = Enumerable.Repeat<int>(0, currentLengths.Length).ToArray();
+
+			List<(Type[] types, SearchTestParams.BufferPatternFillDelegate patternFill)> combinations = new List<(Type[], SearchTestParams.BufferPatternFillDelegate)>();
+			combinations.Add
+			(
+				(
+					new Type[]
+					{
+						patternDefinitions[currentCounter[0]],
+						bufferDefinitions[currentCounter[1]],
+						distanceDefinitions[currentCounter[2]],
+						iterationDefinitions[currentCounter[3]]
+					},
+					delegateDefinitions[currentCounter[4]]
+				)
+			);
+			bool overflow = false;
+			int currentIndex = 0;
+			while (true)
+			{
+				int curr = currentCounter[currentIndex];
+				int next = (++curr) % currentLengths[currentIndex];
+				currentCounter[currentIndex] = next;
+				overflow = next < curr;
+				if (overflow)
+				{
+					if (currentIndex == currentCounter.Length - 1)
+					{
+						break;
+					}
+					++currentIndex;
+				}
+				else
+				{
+					combinations.Add
+					(
+						(
+							new Type[]
+							{
+								patternDefinitions[currentCounter[0]],
+								bufferDefinitions[currentCounter[1]],
+								distanceDefinitions[currentCounter[2]],
+								iterationDefinitions[currentCounter[3]]
+							},
+							delegateDefinitions[currentCounter[4]]
+						)
+					);
+
+					currentIndex = 0;
+				}
 			}
 
 			SearchTests.Clear();
-*/
+
+			for (int i = 0; i < combinations.Count; ++i)
+			{
+				string[] definitionTypes =
+				{
+							$"pattern={combinations[i].types[0].Name!}",
+							$"buffer={combinations[i].types[1].Name!}",
+							$"distance={combinations[i].types[2].Name!}",
+							$"iteration={combinations[i].types[3].Name!}",
+							$"delegate={combinations[i].patternFill.Method.Name}"
+				};
+				string name = string.Join(@", ", definitionTypes);
+				Assembly thisAssembly = this.GetType().Assembly;
+				PatternDefinition pattern = thisAssembly.CreateInstance(combinations[i].types[0].FullName!) as PatternDefinition ?? throw new ArgumentNullException();
+				BufferDefinition buffer = thisAssembly.CreateInstance(combinations[i].types[1].FullName!) as BufferDefinition ?? throw new ArgumentNullException();
+				DistanceDefinition distance = thisAssembly.CreateInstance(combinations[i].types[2].FullName!) as DistanceDefinition ?? throw new ArgumentNullException();
+				IterationsDefinition iteration = thisAssembly.CreateInstance(combinations[i].types[3].FullName!) as IterationsDefinition ?? throw new ArgumentNullException();
+				SearchTestParams.BufferPatternFillDelegate? patternFillDelegate = combinations[i].patternFill;
+				SearchTests.Add(new SearchTestParams(name: name, iteration.Max, pattern.Min, pattern.Max, buffer.Min, buffer.Max, distance.Min, distance.Max, bufferPatternFill: patternFillDelegate));
+			}
 
 
 			Trace.WriteLine(heavyDivider);
