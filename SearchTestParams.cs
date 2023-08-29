@@ -1,5 +1,7 @@
 ﻿namespace SearchTest
 {
+	using Microsoft.Extensions.FileSystemGlobbing.Internal;
+
 	using System;
 	using System.Collections.Generic;
 	using System.Diagnostics;
@@ -8,6 +10,7 @@
 	using System.Runtime.CompilerServices;
 	using System.Text;
 	using System.Threading.Tasks;
+	using System.Xml.Linq;
 
 	public class SearchTestParams
 	{
@@ -41,6 +44,39 @@
 		public class DistanceDefinition : RangeDefinition { public DistanceDefinition(string name, int min, int max) : base(name, min, max) { } };
 		public class IterationsDefinition : RangeDefinition { public IterationsDefinition(string name, int min, int max) : base(name, min, max) { } };
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+		public SearchTestParams
+		(
+			string name,
+			SearchTestParams.IterationsDefinition iterations,
+			SearchTestParams.PatternDefinition pattern,
+			SearchTestParams.BufferDefinition buffer,
+			SearchTestParams.DistanceDefinition distance,
+			OffsetGeneratorDelegate? offsetGenerator = null,
+			PatternGeneratorDelegate? patternGenerator = null,
+			BufferGeneratorDelegate? bufferGenerator = null,
+			BufferFillDelegate? bufferFill = null,
+			BufferPatternFillDelegate? bufferPatternFill = null
+		)
+		{
+			this.Name = name;
+			this.MaxIterations = iterations.Max;
+			this.MinPatternSize = pattern.Min;
+			this.MaxPatternSize = pattern.Max;
+			this.MinBufferSize = buffer.Min;
+			this.MaxBufferSize = buffer.Max;
+			this.MinDistance = distance.Min;
+			this.MaxDistance = distance.Max;
+			this.Pattern = null;
+			this.Buffer = null;
+			this.Offsets = null;
+			this.OffsetGenerator = offsetGenerator ?? this.OffsetGenerator;
+			this.PatternGenerator = patternGenerator ?? this.PatternGenerator;
+			this.BufferGenerator = bufferGenerator ?? this.BufferGenerator;
+			this.BufferFill = bufferFill ?? this.BufferFill;
+			this.BufferPatternFill = bufferPatternFill ?? this.BufferPatternFill;
+
+		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public SearchTestParams
