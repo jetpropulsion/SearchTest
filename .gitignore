@@ -362,4 +362,5 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /Misc.txt
-/TestAllDerivates-638287794187817888.testlog
+/TestAllDerivates-*.testlog
+/*.state

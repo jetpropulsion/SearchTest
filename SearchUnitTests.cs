@@ -7,8 +7,6 @@ namespace SearchTest
 	using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 	using Microsoft.VisualStudio.TestPlatform.ObjectModel.Client;
 
-	using Newtonsoft.Json.Linq;
-
 	using Search.Interfaces;
 
 	using System;
